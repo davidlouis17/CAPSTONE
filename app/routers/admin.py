@@ -11,6 +11,8 @@ from app.auth import authenticate_admin, get_current_admin
 from app.config import APP_NAME, UPLOAD_DIR
 from app.database import db_session
 from app.routers.catalog import ANGLE_LABELS, format_rupiah
+from app.services.rule_engine import calculate_grade_and_price
+from ml.shoe_evaluator import MLEvaluationError, evaluate_shoe_photos
 
 APP_DIR = Path(__file__).resolve().parent.parent
 templates = Jinja2Templates(directory=str(APP_DIR / "templates"))
@@ -19,6 +21,7 @@ templates.env.filters["rupiah"] = format_rupiah
 router = APIRouter(tags=["Admin COE"])
 
 REQUIRED_ANGLES = ("top", "right", "left", "bottom")
+ALLOWED_GRADES = ("A", "B", "C", "D")
 USAGE_DURATION_OPTIONS = ("< 6 bulan", "6 - 12 bulan", "1 - 2 tahun", "> 2 tahun")
 ORIGINALITY_OPTIONS = (
     ("struk_dan_box", "Struk Asli & Box Lengkap"),
@@ -63,7 +66,6 @@ def _log_audit(
 
 
 def _validate_and_save_photo(product_id: int, angle: str, upload: UploadFile, content: bytes) -> tuple[bool, str]:
-    """Validasi citra 4 sisi menggunakan Pillow dan simpan ke folder upload (FR-006, FR-007)."""
     if angle not in REQUIRED_ANGLES:
         return False, f"Sudut foto tidak dikenali: {angle}"
     if not content:
@@ -88,7 +90,6 @@ def _validate_and_save_photo(product_id: int, angle: str, upload: UploadFile, co
     target_path = target_dir / saved_name
     target_path.write_bytes(content)
 
-    # Path publik relatif terhadap /static
     rel_url = f"/static/uploads/shoe_{product_id}/{saved_name}"
     return True, rel_url
 
@@ -128,14 +129,49 @@ def _get_shoe_workspace_data(product_id: int) -> Optional[dict]:
         if angle not in photo_map or not photo_map[angle]["is_valid"]
     ]
     shoe = dict(shoe_row)
+    evaluation = dict(eval_row) if eval_row else None
+    if evaluation and evaluation.get("criteria_breakdown"):
+        try:
+            evaluation["breakdown_dict"] = json.loads(evaluation["criteria_breakdown"])
+        except json.JSONDecodeError:
+            evaluation["breakdown_dict"] = {}
+
     return {
         "shoe": shoe,
         "photo_map": photo_map,
         "missing_angles": missing_angles,
         "photos_complete": len(missing_angles) == 0,
         "ready_for_ai": bool(shoe["physical_verified"]) and len(missing_angles) == 0,
-        "evaluation": dict(eval_row) if eval_row else None,
+        "evaluation": evaluation,
     }
+
+
+def _render_shoe_detail(
+    request: Request,
+    admin: dict,
+    product_id: int,
+    flash_success: str = "",
+    flash_error: str = "",
+    status_code: int = 200,
+) -> HTMLResponse:
+    workspace = _get_shoe_workspace_data(product_id)
+    if not workspace:
+        raise HTTPException(status_code=404, detail="Data sepatu tidak ditemukan.")
+    return templates.TemplateResponse(
+        request=request,
+        name="admin/shoe_detail.html",
+        context={
+            "app_name": APP_NAME,
+            "admin": admin,
+            "workspace": workspace,
+            "angle_labels": ANGLE_LABELS,
+            "required_angles": REQUIRED_ANGLES,
+            "allowed_grades": ALLOWED_GRADES,
+            "flash_success": flash_success,
+            "flash_error": flash_error,
+        },
+        status_code=status_code,
+    )
 
 
 @router.get("/admin/login", response_class=HTMLResponse)
@@ -223,7 +259,7 @@ def admin_dashboard(request: Request):
     shoes = [dict(r) for r in rows]
     counts = {
         "total": len(shoes),
-        "draft": sum(1 for s in shoes if s["process_status"] == "draft"),
+        "draft": sum(1 for s in shoes if s["process_status"] in ("draft", "ml_failed")),
         "pending_review": sum(1 for s in shoes if s["process_status"] == "pending_review"),
         "published": sum(1 for s in shoes if s["process_status"] == "published"),
     }
@@ -376,28 +412,22 @@ def admin_shoe_detail(
         return guard
     admin = get_current_admin(request)
 
-    workspace = _get_shoe_workspace_data(product_id)
-    if not workspace:
-        raise HTTPException(status_code=404, detail="Data sepatu tidak ditemukan.")
-
     flash_messages = {
         "created": "Data sepatu tersimpan sebagai draf. Lanjutkan verifikasi fisik dan unggah 4 sisi foto.",
         "verified": "Status verifikasi fisik berhasil diperbarui dan tercatat di log audit.",
         "photos_saved": "Foto berhasil divalidasi dan disimpan.",
+        "evaluated": "Penilaian citra & kalkulasi aturan selesai. Silakan tinjau hasil sebelum publikasi.",
+        "corrected": "Koreksi manual tersimpan. Nilai asli sistem tetap dipertahankan di riwayat audit.",
+        "published": "Sepatu disetujui dan resmi tayang di katalog publik.",
+        "approved_withheld": "Sepatu disetujui, namun karena Grade D otomatis ditahan agar tidak tampil di katalog publik (BR-009).",
+        "rejected": "Publikasi sepatu ditolak dan tercatat di log audit.",
     }
-
-    return templates.TemplateResponse(
+    return _render_shoe_detail(
         request=request,
-        name="admin/shoe_detail.html",
-        context={
-            "app_name": APP_NAME,
-            "admin": admin,
-            "workspace": workspace,
-            "angle_labels": ANGLE_LABELS,
-            "required_angles": REQUIRED_ANGLES,
-            "flash_success": flash_messages.get(msg, ""),
-            "flash_error": err,
-        },
+        admin=admin,
+        product_id=product_id,
+        flash_success=flash_messages.get(msg, ""),
+        flash_error=err,
     )
 
 
@@ -494,45 +524,266 @@ async def upload_shoe_photos(
             )
 
     if errors:
-        workspace = _get_shoe_workspace_data(product_id)
-        return templates.TemplateResponse(
-            request=request,
-            name="admin/shoe_detail.html",
-            context={
-                "app_name": APP_NAME,
-                "admin": admin,
-                "workspace": workspace,
-                "angle_labels": ANGLE_LABELS,
-                "required_angles": REQUIRED_ANGLES,
-                "flash_success": "",
-                "flash_error": " ".join(errors),
-            },
-            status_code=400,
-        )
+        return _render_shoe_detail(request, admin, product_id, flash_error=" ".join(errors), status_code=400)
 
     if not saved_angles:
-        workspace = _get_shoe_workspace_data(product_id)
-        return templates.TemplateResponse(
-            request=request,
-            name="admin/shoe_detail.html",
-            context={
-                "app_name": APP_NAME,
-                "admin": admin,
-                "workspace": workspace,
-                "angle_labels": ANGLE_LABELS,
-                "required_angles": REQUIRED_ANGLES,
-                "flash_success": "",
-                "flash_error": "Pilih minimal satu file foto (Atas, Kanan, Kiri, atau Bawah) sebelum mengunggah.",
-            },
+        return _render_shoe_detail(
+            request,
+            admin,
+            product_id,
+            flash_error="Pilih minimal satu file foto (Atas, Kanan, Kiri, atau Bawah) sebelum mengunggah.",
             status_code=400,
         )
 
     return RedirectResponse(url=f"/admin/shoes/{product_id}?msg=photos_saved", status_code=303)
 
 
+@router.post("/admin/shoes/{product_id}/evaluate")
+def run_shoe_evaluation(request: Request, product_id: int):
+    """Jalankan inferensi citra 4 sisi + rule engine deterministik (FR-008 s.d. FR-011, FR-022)."""
+    guard = _require_admin_redirect(request)
+    if guard:
+        return guard
+    admin = get_current_admin(request)
+
+    workspace = _get_shoe_workspace_data(product_id)
+    if not workspace:
+        raise HTTPException(status_code=404, detail="Data sepatu tidak ditemukan.")
+
+    shoe = workspace["shoe"]
+    if not shoe["physical_verified"]:
+        return _render_shoe_detail(
+            request,
+            admin,
+            product_id,
+            flash_error="Penilaian ditolak: sepatu harus lolos Physical Verification Gate terlebih dahulu (BR-001).",
+            status_code=400,
+        )
+
+    if not workspace["photos_complete"]:
+        missing_str = ", ".join(ANGLE_LABELS[a] for a in workspace["missing_angles"])
+        return _render_shoe_detail(
+            request,
+            admin,
+            product_id,
+            flash_error=f"Penilaian ditolak: foto 4 sisi belum lengkap ({missing_str}) (FR-007).",
+            status_code=400,
+        )
+
+    photo_paths = {angle: workspace["photo_map"][angle]["file_path"] for angle in REQUIRED_ANGLES}
+
+    try:
+        visual = evaluate_shoe_photos(photo_paths)
+        calc = calculate_grade_and_price(
+            brand=shoe["brand"],
+            condition_score=visual.condition_score,
+            usage_duration=shoe["usage_duration"],
+            originality_status=shoe["originality_status"],
+            reference_new_price=shoe["reference_new_price"],
+        )
+    except MLEvaluationError as exc:
+        # FR-022 / TC-014: gagal -> tandai ml_failed & jangan pernah publikasikan otomatis
+        with db_session() as conn:
+            conn.execute(
+                "UPDATE shoes SET process_status = 'ml_failed' WHERE product_id = ?",
+                (product_id,),
+            )
+            _log_audit(
+                conn,
+                admin_id=admin["admin_id"],
+                action_type="EVALUASI_GAGAL",
+                product_id=product_id,
+                old_value={"process_status": shoe["process_status"]},
+                new_value={"process_status": "ml_failed"},
+                correction_reason=str(exc),
+            )
+        return _render_shoe_detail(
+            request,
+            admin,
+            product_id,
+            flash_error=f"Modul penilaian citra gagal memproses foto: {exc}. Item ditandai ml_failed dan tidak dipublikasikan.",
+            status_code=422,
+        )
+
+    with db_session() as conn:
+        conn.execute(
+            """
+            INSERT INTO evaluations (
+                product_id, condition_score, condition_label, criteria_breakdown,
+                total_points, assigned_grade, recommended_price,
+                final_grade, final_price, rule_version, model_version, status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'success')
+            """,
+            (
+                product_id,
+                visual.condition_score,
+                visual.condition_label,
+                json.dumps(calc.criteria_breakdown),
+                calc.total_points,
+                calc.assigned_grade,
+                calc.recommended_price,
+                calc.assigned_grade,
+                calc.recommended_price,
+                calc.rule_version,
+                visual.model_version,
+            ),
+        )
+        conn.execute(
+            "UPDATE shoes SET process_status = 'pending_review' WHERE product_id = ?",
+            (product_id,),
+        )
+        _log_audit(
+            conn,
+            admin_id=admin["admin_id"],
+            action_type="EVALUASI_AI",
+            product_id=product_id,
+            old_value={"process_status": shoe["process_status"]},
+            new_value={
+                "condition_score": visual.condition_score,
+                "total_points": calc.total_points,
+                "assigned_grade": calc.assigned_grade,
+                "recommended_price": calc.recommended_price,
+                "rule_version": calc.rule_version,
+                "model_version": visual.model_version,
+                "process_status": "pending_review",
+            },
+        )
+
+    return RedirectResponse(url=f"/admin/shoes/{product_id}?msg=evaluated", status_code=303)
+
+
+@router.post("/admin/shoes/{product_id}/correct")
+def correct_evaluation(
+    request: Request,
+    product_id: int,
+    final_grade: str = Form(...),
+    final_price: str = Form(...),
+    correction_reason: str = Form(...),
+):
+    """Koreksi manual grade/harga oleh admin dengan alasan wajib (FR-013, BR-007, TC-010)."""
+    guard = _require_admin_redirect(request)
+    if guard:
+        return guard
+    admin = get_current_admin(request)
+
+    workspace = _get_shoe_workspace_data(product_id)
+    if not workspace or not workspace["evaluation"]:
+        return _render_shoe_detail(
+            request,
+            admin,
+            product_id,
+            flash_error="Belum ada hasil evaluasi untuk dikoreksi.",
+            status_code=400,
+        )
+
+    cleaned_grade = final_grade.strip().upper()
+    cleaned_reason = correction_reason.strip()
+    if cleaned_grade not in ALLOWED_GRADES:
+        return _render_shoe_detail(request, admin, product_id, flash_error="Pilihan grade tidak valid.", status_code=400)
+    if not cleaned_reason:
+        return _render_shoe_detail(
+            request,
+            admin,
+            product_id,
+            flash_error="Alasan koreksi wajib diisi setiap kali admin mengubah grade atau harga (FR-013).",
+            status_code=400,
+        )
+    try:
+        parsed_price = float(final_price)
+        if parsed_price < 0:
+            raise ValueError
+    except ValueError:
+        return _render_shoe_detail(
+            request,
+            admin,
+            product_id,
+            flash_error="Harga jual akhir harus berupa angka valid dan tidak negatif.",
+            status_code=400,
+        )
+
+    ev = workspace["evaluation"]
+    with db_session() as conn:
+        # assigned_grade & recommended_price TIDAK diubah agar hasil asli sistem tetap terjaga (BR-007)
+        conn.execute(
+            "UPDATE evaluations SET final_grade = ?, final_price = ? WHERE evaluation_id = ?",
+            (cleaned_grade, parsed_price, ev["evaluation_id"]),
+        )
+        _log_audit(
+            conn,
+            admin_id=admin["admin_id"],
+            action_type="KOREKSI",
+            product_id=product_id,
+            old_value={"final_grade": ev["final_grade"], "final_price": ev["final_price"]},
+            new_value={"final_grade": cleaned_grade, "final_price": parsed_price},
+            correction_reason=cleaned_reason,
+        )
+
+    return RedirectResponse(url=f"/admin/shoes/{product_id}?msg=corrected", status_code=303)
+
+
+@router.post("/admin/shoes/{product_id}/decision")
+def decide_publication(
+    request: Request,
+    product_id: int,
+    decision: str = Form(...),
+    decision_note: str = Form(""),
+):
+    """Persetujuan atau penolakan publikasi sepatu (FR-014, BR-008, BR-009, TC-011 s.d. TC-013)."""
+    guard = _require_admin_redirect(request)
+    if guard:
+        return guard
+    admin = get_current_admin(request)
+
+    workspace = _get_shoe_workspace_data(product_id)
+    if not workspace or not workspace["evaluation"]:
+        return _render_shoe_detail(
+            request,
+            admin,
+            product_id,
+            flash_error="Jalankan evaluasi terlebih dahulu sebelum memutuskan publikasi.",
+            status_code=400,
+        )
+
+    shoe = workspace["shoe"]
+    ev = workspace["evaluation"]
+    note = decision_note.strip() or None
+
+    if decision == "approve":
+        # BR-009 / TC-013: Grade D disetujui secara internal tapi TIDAK dipublikasikan ke katalog publik
+        if ev["final_grade"] == "D":
+            new_status = "approved"
+            msg_key = "approved_withheld"
+        else:
+            new_status = "published"
+            msg_key = "published"
+        action_type = "PERSETUJUAN"
+    elif decision == "reject":
+        new_status = "rejected"
+        msg_key = "rejected"
+        action_type = "PENOLAKAN"
+    else:
+        return _render_shoe_detail(request, admin, product_id, flash_error="Keputusan tidak dikenali.", status_code=400)
+
+    with db_session() as conn:
+        conn.execute(
+            "UPDATE shoes SET process_status = ? WHERE product_id = ?",
+            (new_status, product_id),
+        )
+        _log_audit(
+            conn,
+            admin_id=admin["admin_id"],
+            action_type=action_type,
+            product_id=product_id,
+            old_value={"process_status": shoe["process_status"]},
+            new_value={"process_status": new_status, "final_grade": ev["final_grade"], "final_price": ev["final_price"]},
+            correction_reason=note,
+        )
+
+    return RedirectResponse(url=f"/admin/shoes/{product_id}?msg={msg_key}", status_code=303)
+
+
 @router.get("/api/admin/shoes/{product_id}/readiness", response_class=JSONResponse)
 def check_shoe_readiness_api(request: Request, product_id: int):
-    """Cek kesiapan sepatu sebelum inferensi AI (BR-001, FR-007, TC-005, TC-007)."""
     admin = get_current_admin(request)
     if not admin:
         raise HTTPException(status_code=401, detail="Otentikasi admin diperlukan.")

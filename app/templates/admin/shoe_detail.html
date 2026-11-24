@@ -26,7 +26,11 @@
         <section class="bg-white border border-stone-200 rounded-2xl p-6">
             <div class="flex items-center justify-between mb-3">
                 <span class="text-xs font-mono text-stone-500">ID #{{ workspace.shoe.product_id }}</span>
-                <span class="text-xs font-semibold px-2.5 py-1 rounded-md bg-stone-100 text-stone-800">
+                <span class="text-xs font-semibold px-2.5 py-1 rounded-md
+                    {% if workspace.shoe.process_status == 'published' %}bg-emerald-100 text-emerald-800
+                    {% elif workspace.shoe.process_status == 'rejected' or workspace.shoe.process_status == 'ml_failed' %}bg-red-100 text-red-800
+                    {% elif workspace.shoe.process_status == 'pending_review' %}bg-amber-100 text-amber-800
+                    {% else %}bg-stone-100 text-stone-800{% endif %}">
                     {{ workspace.shoe.process_status }}
                 </span>
             </div>
@@ -154,27 +158,136 @@
         </section>
 
         <section class="bg-white border border-stone-200 rounded-2xl p-6">
-            <h2 class="text-base font-semibold text-stone-900 mb-2">3. Kesiapan Inferensi CNN &amp; Rule Engine</h2>
-            {% if workspace.ready_for_ai %}
-            <div class="rounded-xl bg-emerald-50 border border-emerald-200 p-4 text-sm text-emerald-900">
-                <p class="font-medium mb-1">Syarat lengkap — siap dinilai pada Step 4</p>
-                <p class="text-xs text-emerald-800">
-                    Verifikasi fisik sudah lolos dan keempat foto sisi valid. Tombol jalankan inferensi CNN + perhitungan grade/harga otomatis akan aktif di Step 4.
-                </p>
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                <div>
+                    <h2 class="text-base font-semibold text-stone-900">3. Penilaian Citra &amp; Rule Engine (FR-008 s.d. FR-012)</h2>
+                    <p class="text-xs text-stone-500">Evaluasi kondisi 4 sisi foto lalu hitung poin, grade, dan harga deterministik.</p>
+                </div>
+                <form method="post" action="/admin/shoes/{{ workspace.shoe.product_id }}/evaluate">
+                    <button
+                        type="submit"
+                        {% if not workspace.ready_for_ai %}disabled{% endif %}
+                        class="rounded-xl px-4 py-2 text-sm font-medium transition
+                            {% if workspace.ready_for_ai %}bg-emerald-700 text-white hover:bg-emerald-800{% else %}bg-stone-200 text-stone-400 cursor-not-allowed{% endif %}"
+                    >
+                        Jalankan Penilaian AI
+                    </button>
+                </form>
             </div>
-            {% else %}
-            <div class="rounded-xl bg-amber-50 border border-amber-200 p-4 text-sm text-amber-900">
-                <p class="font-medium mb-1">Belum dapat menjalankan penilaian final</p>
-                <ul class="list-disc pl-5 text-xs space-y-1 text-amber-800">
-                    {% if not workspace.shoe.physical_verified %}
-                    <li>Centang dan simpan <strong>Physical Verification Gate</strong> terlebih dahulu (BR-001).</li>
-                    {% endif %}
-                    {% if not workspace.photos_complete %}
-                    <li>Lengkapi foto sisi yang masih kurang:
-                        <strong>{% for a in workspace.missing_angles %}{{ angle_labels[a] }}{% if not loop.last %}, {% endif %}{% endfor %}</strong> (FR-007).
-                    </li>
-                    {% endif %}
-                </ul>
+
+            {% if not workspace.ready_for_ai %}
+            <div class="rounded-xl bg-amber-50 border border-amber-200 p-4 text-xs text-amber-900 space-y-1">
+                <p class="font-semibold">Syarat sebelum menjalankan penilaian:</p>
+                {% if not workspace.shoe.physical_verified %}
+                <p>- Centang dan simpan Physical Verification Gate (BR-001).</p>
+                {% endif %}
+                {% if not workspace.photos_complete %}
+                <p>- Lengkapi foto sisi: {% for a in workspace.missing_angles %}{{ angle_labels[a] }}{% if not loop.last %}, {% endif %}{% endfor %} (FR-007).</p>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            {% if workspace.evaluation %}
+            {% set ev = workspace.evaluation %}
+            <div class="mt-4 pt-4 border-t border-stone-100 space-y-5">
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div class="p-3.5 rounded-xl bg-stone-50 border border-stone-200">
+                        <p class="text-[11px] text-stone-500">Skor Visual Citra</p>
+                        <p class="text-lg font-semibold text-stone-900">{{ "%.1f"|format(ev.condition_score) }}</p>
+                        <p class="text-[11px] text-stone-600">{{ ev.condition_label }}</p>
+                    </div>
+                    <div class="p-3.5 rounded-xl bg-stone-50 border border-stone-200">
+                        <p class="text-[11px] text-stone-500">Total Poin (v{{ ev.rule_version }})</p>
+                        <p class="text-lg font-semibold text-stone-900">{{ "%.1f"|format(ev.total_points) }} / 100</p>
+                        <p class="text-[11px] text-stone-500">{{ ev.model_version }}</p>
+                    </div>
+                    <div class="p-3.5 rounded-xl bg-stone-50 border border-stone-200">
+                        <p class="text-[11px] text-stone-500">Grade Sistem → Final</p>
+                        <p class="text-lg font-semibold text-stone-900">
+                            {{ ev.assigned_grade }}{% if ev.final_grade != ev.assigned_grade %} → <span class="text-amber-700">{{ ev.final_grade }}</span>{% endif %}
+                        </p>
+                    </div>
+                    <div class="p-3.5 rounded-xl bg-stone-50 border border-stone-200">
+                        <p class="text-[11px] text-stone-500">Harga Rekomendasi → Final</p>
+                        <p class="text-sm font-semibold text-stone-900">{{ ev.final_price | rupiah }}</p>
+                        {% if ev.final_price != ev.recommended_price %}
+                        <p class="text-[11px] text-stone-400 line-through">{{ ev.recommended_price | rupiah }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                {% if ev.breakdown_dict %}
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                    <div class="px-3 py-2 rounded-lg bg-stone-50 border border-stone-200 flex justify-between">
+                        <span class="text-stone-500">Merek</span>
+                        <span class="font-semibold">{{ ev.breakdown_dict.get('brand', 0) }}</span>
+                    </div>
+                    <div class="px-3 py-2 rounded-lg bg-stone-50 border border-stone-200 flex justify-between">
+                        <span class="text-stone-500">Kondisi</span>
+                        <span class="font-semibold">{{ ev.breakdown_dict.get('condition', 0) }}</span>
+                    </div>
+                    <div class="px-3 py-2 rounded-lg bg-stone-50 border border-stone-200 flex justify-between">
+                        <span class="text-stone-500">Pemakaian</span>
+                        <span class="font-semibold">{{ ev.breakdown_dict.get('usage_duration', 0) }}</span>
+                    </div>
+                    <div class="px-3 py-2 rounded-lg bg-stone-50 border border-stone-200 flex justify-between">
+                        <span class="text-stone-500">Originalitas</span>
+                        <span class="font-semibold">{{ ev.breakdown_dict.get('originality', 0) }}</span>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                    <form method="post" action="/admin/shoes/{{ workspace.shoe.product_id }}/correct" class="p-4 rounded-xl border border-stone-200 bg-stone-50/50 space-y-3">
+                        <h3 class="text-sm font-semibold text-stone-900">Koreksi Manual (FR-013)</h3>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[11px] text-stone-600 mb-1">Grade Akhir</label>
+                                <select name="final_grade" class="w-full rounded-lg border border-stone-300 bg-white px-2.5 py-2 text-xs">
+                                    {% for g in allowed_grades %}
+                                    <option value="{{ g }}" {% if ev.final_grade == g %}selected{% endif %}>Grade {{ g }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-stone-600 mb-1">Harga Akhir (Rp)</label>
+                                <input name="final_price" type="number" min="0" step="5000" value="{{ ev.final_price|int }}" class="w-full rounded-lg border border-stone-300 bg-white px-2.5 py-2 text-xs" />
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] text-stone-600 mb-1">Alasan Koreksi (wajib)</label>
+                            <textarea name="correction_reason" rows="2" required placeholder="Jelaskan alasan perubahan grade/harga..." class="w-full rounded-lg border border-stone-300 bg-white px-2.5 py-1.5 text-xs"></textarea>
+                        </div>
+                        <button type="submit" class="w-full rounded-lg border border-stone-300 bg-white text-stone-900 text-xs font-medium py-2 hover:bg-stone-100 transition">
+                            Simpan Koreksi Manual
+                        </button>
+                    </form>
+
+                    <form method="post" action="/admin/shoes/{{ workspace.shoe.product_id }}/decision" class="p-4 rounded-xl border border-stone-200 bg-stone-50/50 space-y-3 flex flex-col justify-between">
+                        <div class="space-y-3">
+                            <h3 class="text-sm font-semibold text-stone-900">Keputusan Publikasi (FR-014)</h3>
+                            <p class="text-xs text-stone-600">
+                                {% if ev.final_grade == 'D' %}
+                                Grade akhir adalah <strong>D</strong>: jika disetujui, sepatu dicatat <code>approved</code> namun otomatis <strong>tidak ditampilkan</strong> di katalog publik (BR-009).
+                                {% else %}
+                                Jika disetujui, sepatu berstatus <code>published</code> dan langsung tampil di katalog publik.
+                                {% endif %}
+                            </p>
+                            <div>
+                                <label class="block text-[11px] text-stone-600 mb-1">Catatan Keputusan (opsional)</label>
+                                <input name="decision_note" type="text" placeholder="Catatan persetujuan / penolakan..." class="w-full rounded-lg border border-stone-300 bg-white px-2.5 py-2 text-xs" />
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 pt-2">
+                            <button type="submit" name="decision" value="approve" class="rounded-lg bg-emerald-700 text-white text-xs font-medium py-2 hover:bg-emerald-800 transition">
+                                Setujui Publikasi
+                            </button>
+                            <button type="submit" name="decision" value="reject" class="rounded-lg bg-red-600 text-white text-xs font-medium py-2 hover:bg-red-700 transition">
+                                Tolak Publikasi
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
             {% endif %}
         </section>
