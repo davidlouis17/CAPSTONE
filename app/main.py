@@ -5,36 +5,24 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
-from app.config import APP_NAME, DATABASE_PATH, IS_VERCEL, SECRET_KEY, UPLOAD_DIR
+from app.config import APP_NAME, DATABASE_PATH, SECRET_KEY, UPLOAD_DIR
 from app.database import db_session, init_db
 from app.routers.admin import router as admin_router
 from app.routers.admin_governance import router as governance_router
 from app.routers.catalog import router as catalog_router
-from app.seed import seed_database
 
 APP_DIR = Path(__file__).resolve().parent
 
 
-def _bootstrap_runtime() -> None:
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    init_db()
-    if IS_VERCEL:
-        seed_database()
-
-
-_bootstrap_runtime()
-
-
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    _bootstrap_runtime()
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    init_db()
     yield
 
 
 app = FastAPI(title=APP_NAME, lifespan=lifespan)
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY, same_site="lax")
-# Mount /static/uploads lebih dulu agar foto upload di /tmp (Vercel) & lokal sama-sama dapat diakses
-app.mount("/static/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 app.mount("/static", StaticFiles(directory=str(APP_DIR / "static")), name="static")
 app.include_router(catalog_router)
 app.include_router(admin_router)
@@ -59,7 +47,6 @@ def health_check():
     return {
         "status": "ok",
         "app": APP_NAME,
-        "runtime": "vercel" if IS_VERCEL else "local",
         "database": DATABASE_PATH.name,
         "total_shoes": shoe_count,
         "published_shoes": published_count,
