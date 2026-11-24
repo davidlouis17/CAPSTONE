@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Dict
 from PIL import Image, ImageFilter, ImageStat, UnidentifiedImageError
 
-from app.config import BASE_DIR, CNN_MODEL_PATH
+import app.config as app_config
 
 REQUIRED_ANGLES = ("top", "right", "left", "bottom")
 
@@ -22,10 +22,13 @@ class VisualEvaluationResult:
 
 def _resolve_local_path(file_path: str) -> Path:
     """Ubah URL /static/... atau path relatif menjadi Path lokal yang valid."""
+    if file_path.startswith("/static/uploads/"):
+        rel = file_path.replace("/static/uploads/", "", 1)
+        return (app_config.UPLOAD_DIR / rel).resolve()
     if file_path.startswith("/static/"):
-        return (BASE_DIR / "app" / file_path.lstrip("/")).resolve()
+        return (app_config.BASE_DIR / "app" / file_path.lstrip("/")).resolve()
     p = Path(file_path)
-    return p if p.is_absolute() else (BASE_DIR / p).resolve()
+    return p if p.is_absolute() else (app_config.BASE_DIR / p).resolve()
 
 
 def _label_from_score(score: float) -> str:
@@ -73,7 +76,7 @@ def _score_single_raster_image(img_path: Path, angle: str) -> float:
 
 def _try_keras_cnn_inference(resolved_paths: Dict[str, Path]) -> VisualEvaluationResult | None:
     """Adapter opsional: gunakan model CNN Keras/TF terlatih jika file model & library tersedia."""
-    if not CNN_MODEL_PATH.exists():
+    if not app_config.CNN_MODEL_PATH.exists():
         return None
     try:
         import numpy as np  # type: ignore
@@ -81,7 +84,7 @@ def _try_keras_cnn_inference(resolved_paths: Dict[str, Path]) -> VisualEvaluatio
     except ImportError:
         return None
 
-    model = keras.models.load_model(str(CNN_MODEL_PATH))
+    model = keras.models.load_model(str(app_config.CNN_MODEL_PATH))
     angle_scores: Dict[str, float] = {}
     for angle, path in resolved_paths.items():
         with Image.open(path) as raw:
@@ -100,7 +103,7 @@ def _try_keras_cnn_inference(resolved_paths: Dict[str, Path]) -> VisualEvaluatio
         condition_score=avg_score,
         condition_label=_label_from_score(avg_score),
         angle_scores=angle_scores,
-        model_version=f"cnn-keras-{CNN_MODEL_PATH.stem}",
+        model_version=f"cnn-keras-{app_config.CNN_MODEL_PATH.stem}",
     )
 
 

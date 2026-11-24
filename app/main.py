@@ -8,6 +8,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.config import APP_NAME, DATABASE_PATH, SECRET_KEY, UPLOAD_DIR
 from app.database import db_session, init_db
 from app.routers.admin import router as admin_router
+from app.routers.admin_governance import router as governance_router
 from app.routers.catalog import router as catalog_router
 
 APP_DIR = Path(__file__).resolve().parent
@@ -25,6 +26,7 @@ app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY, same_site="lax")
 app.mount("/static", StaticFiles(directory=str(APP_DIR / "static")), name="static")
 app.include_router(catalog_router)
 app.include_router(admin_router)
+app.include_router(governance_router)
 
 
 @app.get("/health", response_class=JSONResponse)

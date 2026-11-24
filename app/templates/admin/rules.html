@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block title %}Pengelolaan Aturan Bisnis — {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
+    <div>
+        <p class="text-xs font-medium uppercase tracking-widest text-emerald-700 mb-1">Konfigurasi Aturan (FR-019 &amp; NFR-009)</p>
+        <h1 class="text-2xl sm:text-3xl font-semibold tracking-tight text-stone-900">Aturan Bobot, Grade &amp; Potongan Harga</h1>
+    </div>
+    <a href="/admin" class="text-sm text-stone-600 hover:text-stone-900">← Kembali ke Dasbor</a>
+</div>
+
+{% if flash_success %}
+<div class="mb-6 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-sm px-4 py-3">{{ flash_success }}</div>
+{% endif %}
+{% if flash_error %}
+<div class="mb-6 rounded-xl bg-red-50 border border-red-200 text-red-800 text-sm px-4 py-3">{{ flash_error }}</div>
+{% endif %}
+
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+    <div class="lg:col-span-7 bg-white border border-stone-200 rounded-2xl p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-base font-semibold text-stone-900">
+                Perbarui Aturan Aktif (Saat ini v{{ active_rule.version if active_rule else '-' }})
+            </h2>
+            {% if not can_edit %}
+            <span class="text-xs font-medium text-amber-800 bg-amber-50 px-2.5 py-1 rounded-md">Mode Baca Saja</span>
+            {% endif %}
+        </div>
+
+        {% if not can_edit %}
+        <div class="mb-5 rounded-xl bg-stone-50 border border-stone-200 p-4 text-xs text-stone-600">
+            Kamu login sebagai <strong>{{ admin.role }}</strong>. Perubahan bobot, batas grade, dan persentase potongan hanya diizinkan untuk akun <strong>Manajemen COE</strong> (<code>manajemen@localthrift.id</code>).
+        </div>
+        {% endif %}
+
+        {% if active_rule %}
+        <form method="post" action="/admin/rules" class="space-y-5">
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-2">Bobot 4 Kriteria (Total Wajib = 100)</p>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div>
+                        <label class="block text-xs text-stone-600 mb-1">Merek</label>
+                        <input name="weight_brand" type="number" value="{{ active_rule.weights.brand }}" {% if not can_edit %}disabled{% endif %} class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" />
+                    </div>
+                    <div>
+                        <label class="block text-xs text-stone-600 mb-1">Kondisi Fisik</label>
+                        <input name="weight_condition" type="number" value="{{ active_rule.weights.condition }}" {% if not can_edit %}disabled{% endif %} class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" />
+                    </div>
+                    <div>
+                        <label class="block text-xs text-stone-600 mb-1">Pemakaian</label>
+                        <input name="weight_usage" type="number" value="{{ active_rule.weights.usage_duration }}" {% if not can_edit %}disabled{% endif %} class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" />
+                    </div>
+                    <div>
+                        <label class="block text-xs text-stone-600 mb-1">Originalitas</label>
+                        <input name="weight_originality" type="number" value="{{ active_rule.weights.originality }}" {% if not can_edit %}disabled{% endif %} class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" />
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-2">Batas Minimum Poin Grade (D = &lt; C)</p>
+                <div class="grid grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-xs text-stone-600 mb-1">Grade A (≥)</label>
+                        <input name="threshold_a" type="number" value="{{ active_rule.thresholds.A }}" {% if not can_edit %}disabled{% endif %} class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" />
+                    </div>
+                    <div>
+                        <label class="block text-xs text-stone-600 mb-1">Grade B (≥)</label>
+                        <input name="threshold_b" type="number" value="{{ active_rule.thresholds.B }}" {% if not can_edit %}disabled{% endif %} class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" />
+                    </div>
+                    <div>
+                        <label class="block text-xs text-stone-600 mb-1">Grade C (≥)</label>
+                        <input name="threshold_c" type="number" value="{{ active_rule.thresholds.C }}" {% if not can_edit %}disabled{% endif %} class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" />
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-2">Potongan Harga dari Harga Baru Referensi (%)</p>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div>
+                        <label class="block text-xs text-stone-600 mb-1">Potongan A (%)</label>
+                        <input name="discount_a" type="number" value="{{ active_rule.discounts.A }}" {% if not can_edit %}disabled{% endif %} class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" />
+                    </div>
+                    <div>
+                        <label class="block text-xs text-stone-600 mb-1">Potongan B (%)</label>
+                        <input name="discount_b" type="number" value="{{ active_rule.discounts.B }}" {% if not can_edit %}disabled{% endif %} class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" />
+                    </div>
+                    <div>
+                        <label class="block text-xs text-stone-600 mb-1">Potongan C (%)</label>
+                        <input name="discount_c" type="number" value="{{ active_rule.discounts.C }}" {% if not can_edit %}disabled{% endif %} class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" />
+                    </div>
+                    <div>
+                        <label class="block text-xs text-stone-600 mb-1">Potongan D (%)</label>
+                        <input name="discount_d" type="number" value="{{ active_rule.discounts.D }}" {% if not can_edit %}disabled{% endif %} class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs text-stone-600 mb-1">Kelipatan Pembulatan (Rp)</label>
+                    <input name="rounding_unit" type="number" step="1000" value="{{ active_rule.rounding_unit }}" {% if not can_edit %}disabled{% endif %} class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" />
+                </div>
+                <div>
+                    <label class="block text-xs text-stone-600 mb-1">Alasan Pembaruan Aturan *</label>
+                    <input name="change_reason" type="text" required placeholder="Contoh: Penyesuaian rapat COE Nov 2026" {% if not can_edit %}disabled{% endif %} class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" />
+                </div>
+            </div>
+
+            {% if can_edit %}
+            <button type="submit" class="rounded-xl bg-stone-900 text-white text-sm font-medium px-5 py-2.5 hover:bg-stone-800 transition">
+                Simpan &amp; Aktifkan Versi Baru
+            </button>
+            {% endif %}
+        </form>
+        {% endif %}
+    </div>
+
+    <div class="lg:col-span-5 bg-white border border-stone-200 rounded-2xl p-6">
+        <h2 class="text-base font-semibold text-stone-900 mb-4">Riwayat Versi Aturan (Snapshot)</h2>
+        <div class="space-y-3">
+            {% for r in rules %}
+            <div class="p-4 rounded-xl border {% if r.is_active %}border-emerald-300 bg-emerald-50/40{% else %}border-stone-200 bg-stone-50{% endif %} text-xs space-y-1">
+                <div class="flex items-center justify-between">
+                    <span class="font-semibold text-stone-900">Versi v{{ r.version }}</span>
+                    {% if r.is_active %}
+                    <span class="text-[11px] font-semibold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded">Aktif</span>
+                    {% else %}
+                    <span class="text-[11px] text-stone-500">Arsip</span>
+                    {% endif %}
+                </div>
+                <p class="text-stone-600">Bobot: Merek {{ r.weights.brand }} · Kondisi {{ r.weights.condition }} · Pakai {{ r.weights.usage_duration }} · Orig {{ r.weights.originality }}</p>
+                <p class="text-stone-600">Batas: A≥{{ r.thresholds.A }}, B≥{{ r.thresholds.B }}, C≥{{ r.thresholds.C }}</p>
+                <p class="text-stone-600">Potongan: A {{ r.discounts.A }}%, B {{ r.discounts.B }}%, C {{ r.discounts.C }}%, D {{ r.discounts.D }}% (bulat Rp {{ r.rounding_unit }})</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
