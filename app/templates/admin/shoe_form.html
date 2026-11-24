@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+
+{% block title %}Input Sepatu Baru — {{ app_name }}{% endblock %}
+
+{% block content %}
+<nav class="text-xs text-stone-500 mb-6 flex items-center gap-2">
+    <a href="/admin" class="hover:text-stone-900">Dasbor Admin</a>
+    <span>/</span>
+    <span class="text-stone-900 font-medium">Input Sepatu Baru</span>
+</nav>
+
+<div class="max-w-2xl bg-white border border-stone-200 rounded-2xl p-6 sm:p-8">
+    <h1 class="text-2xl font-semibold tracking-tight text-stone-900 mb-1">Input Data Sepatu Bekas</h1>
+    <p class="text-sm text-stone-500 mb-6">
+        Lengkapi informasi dasar sepatu sesuai FR-004. Setelah tersimpan sebagai draf, lanjutkan ke verifikasi fisik dan unggah 4 sisi foto.
+    </p>
+
+    {% if error %}
+    <div class="mb-5 rounded-xl bg-red-50 border border-red-200 text-red-800 text-sm px-4 py-3">
+        {{ error }}
+    </div>
+    {% endif %}
+
+    <form method="post" action="/admin/shoes/new" class="space-y-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+                <label for="brand" class="block text-sm font-medium text-stone-700 mb-1.5">Merek Sepatu *</label>
+                <input
+                    id="brand"
+                    name="brand"
+                    type="text"
+                    required
+                    value="{{ form_data.get('brand', '') }}"
+                    placeholder="Contoh: Nike, Adidas, New Balance"
+                    class="w-full rounded-xl border border-stone-300 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                />
+            </div>
+            <div>
+                <label for="model_name" class="block text-sm font-medium text-stone-700 mb-1.5">Model / Seri</label>
+                <input
+                    id="model_name"
+                    name="model_name"
+                    type="text"
+                    value="{{ form_data.get('model_name', '') }}"
+                    placeholder="Contoh: Air Force 1 '07"
+                    class="w-full rounded-xl border border-stone-300 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                />
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+                <label for="size_eu" class="block text-sm font-medium text-stone-700 mb-1.5">Ukuran (EU)</label>
+                <input
+                    id="size_eu"
+                    name="size_eu"
+                    type="text"
+                    value="{{ form_data.get('size_eu', '') }}"
+                    placeholder="Contoh: 42"
+                    class="w-full rounded-xl border border-stone-300 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                />
+            </div>
+            <div>
+                <label for="usage_duration" class="block text-sm font-medium text-stone-700 mb-1.5">Lama Pemakaian *</label>
+                <select
+                    id="usage_duration"
+                    name="usage_duration"
+                    required
+                    class="w-full rounded-xl border border-stone-300 bg-white px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                >
+                    {% for opt in usage_options %}
+                    <option value="{{ opt }}" {% if form_data.get('usage_duration') == opt %}selected{% endif %}>{{ opt }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+                <label for="purchase_price" class="block text-sm font-medium text-stone-700 mb-1.5">Harga Beli Awal (Rp) *</label>
+                <input
+                    id="purchase_price"
+                    name="purchase_price"
+                    type="number"
+                    min="0"
+                    step="1000"
+                    required
+                    value="{{ form_data.get('purchase_price', '') }}"
+                    placeholder="1200000"
+                    class="w-full rounded-xl border border-stone-300 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                />
+            </div>
+            <div>
+                <label for="reference_new_price" class="block text-sm font-medium text-stone-700 mb-1.5">Harga Baru Referensi (Rp) *</label>
+                <input
+                    id="reference_new_price"
+                    name="reference_new_price"
+                    type="number"
+                    min="1000"
+                    step="1000"
+                    required
+                    value="{{ form_data.get('reference_new_price', '') }}"
+                    placeholder="1549000"
+                    class="w-full rounded-xl border border-stone-300 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                />
+            </div>
+        </div>
+
+        <div>
+            <label for="originality_status" class="block text-sm font-medium text-stone-700 mb-1.5">Status Bukti Originalitas *</label>
+            <select
+                id="originality_status"
+                name="originality_status"
+                required
+                class="w-full rounded-xl border border-stone-300 bg-white px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+            >
+                {% for val, label in originality_options %}
+                <option value="{{ val }}" {% if form_data.get('originality_status') == val %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="pt-3 flex items-center gap-3">
+            <button
+                type="submit"
+                class="rounded-xl bg-stone-900 text-white text-sm font-medium px-5 py-2.5 hover:bg-stone-800 transition"
+            >
+                Simpan Draf &amp; Lanjut Verifikasi
+            </button>
+            <a href="/admin" class="text-sm text-stone-600 hover:text-stone-900 px-3 py-2">Batal</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

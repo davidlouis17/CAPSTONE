@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}Dasbor Admin — {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
+    <div>
+        <p class="text-xs font-medium uppercase tracking-widest text-emerald-700 mb-1">
+            {{ admin.name }} ({{ admin.role }})
+        </p>
+        <h1 class="text-2xl sm:text-3xl font-semibold tracking-tight text-stone-900">
+            Dasbor Kurasi Sepatu
+        </h1>
+    </div>
+    <a
+        href="/admin/shoes/new"
+        class="inline-flex items-center justify-center rounded-xl bg-stone-900 text-white text-sm font-medium px-4 py-2.5 hover:bg-stone-800 transition"
+    >
+        + Input Sepatu Baru
+    </a>
+</div>
+
+<section class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+    <div class="bg-white border border-stone-200 rounded-xl p-5">
+        <p class="text-xs text-stone-500 mb-1">Total Sepatu</p>
+        <p class="text-2xl font-semibold text-stone-900">{{ counts.total }}</p>
+    </div>
+    <div class="bg-white border border-stone-200 rounded-xl p-5">
+        <p class="text-xs text-stone-500 mb-1">Draf / Verifikasi</p>
+        <p class="text-2xl font-semibold text-stone-700">{{ counts.draft }}</p>
+    </div>
+    <div class="bg-white border border-stone-200 rounded-xl p-5">
+        <p class="text-xs text-stone-500 mb-1">Menunggu Review</p>
+        <p class="text-2xl font-semibold text-amber-700">{{ counts.pending_review }}</p>
+    </div>
+    <div class="bg-white border border-stone-200 rounded-xl p-5">
+        <p class="text-xs text-stone-500 mb-1">Tayang di Katalog</p>
+        <p class="text-2xl font-semibold text-emerald-700">{{ counts.published }}</p>
+    </div>
+</section>
+
+<section class="bg-white border border-stone-200 rounded-2xl overflow-hidden">
+    <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm">
+            <thead class="bg-stone-50 border-b border-stone-200 text-xs uppercase text-stone-500">
+                <tr>
+                    <th class="px-5 py-3.5">ID</th>
+                    <th class="px-5 py-3.5">Sepatu</th>
+                    <th class="px-5 py-3.5">Verifikasi Fisik</th>
+                    <th class="px-5 py-3.5">Foto 4 Sisi</th>
+                    <th class="px-5 py-3.5">Grade / Harga</th>
+                    <th class="px-5 py-3.5">Status</th>
+                    <th class="px-5 py-3.5 text-right">Aksi</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-stone-100">
+                {% for shoe in shoes %}
+                <tr class="hover:bg-stone-50/70">
+                    <td class="px-5 py-4 font-mono text-xs text-stone-500">#{{ shoe.product_id }}</td>
+                    <td class="px-5 py-4">
+                        <p class="font-medium text-stone-900">{{ shoe.brand }} {{ shoe.model_name }}</p>
+                        <p class="text-xs text-stone-500">Ref. baru: {{ shoe.reference_new_price | rupiah }}</p>
+                    </td>
+                    <td class="px-5 py-4">
+                        {% if shoe.physical_verified %}
+                        <span class="text-xs font-medium text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md">Lolos</span>
+                        {% else %}
+                        <span class="text-xs font-medium text-amber-700 bg-amber-50 px-2.5 py-1 rounded-md">Belum</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-5 py-4">
+                        <span class="text-xs font-medium {% if shoe.valid_photo_count == 4 %}text-emerald-700{% else %}text-amber-700{% endif %}">
+                            {{ shoe.valid_photo_count }} / 4 foto
+                        </span>
+                    </td>
+                    <td class="px-5 py-4">
+                        {% if shoe.final_grade %}
+                        <span class="font-semibold text-stone-900">Grade {{ shoe.final_grade }}</span>
+                        <span class="block text-xs text-stone-500">{{ shoe.final_price | rupiah }}</span>
+                        {% else %}
+                        <span class="text-xs text-stone-400">Belum dinilai</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-5 py-4">
+                        <span class="text-xs font-medium px-2.5 py-1 rounded-md bg-stone-100 text-stone-700">
+                            {{ shoe.process_status }}
+                        </span>
+                    </td>
+                    <td class="px-5 py-4 text-right">
+                        <a
+                            href="/admin/shoes/{{ shoe.product_id }}"
+                            class="text-xs font-medium text-emerald-700 hover:text-emerald-800 px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 transition"
+                        >
+                            Kelola →
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

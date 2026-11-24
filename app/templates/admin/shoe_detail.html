@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+
+{% block title %}Kelola Sepatu #{{ workspace.shoe.product_id }} — {{ app_name }}{% endblock %}
+
+{% block content %}
+<nav class="text-xs text-stone-500 mb-6 flex items-center gap-2">
+    <a href="/admin" class="hover:text-stone-900">Dasbor Admin</a>
+    <span>/</span>
+    <span class="text-stone-900 font-medium">#{{ workspace.shoe.product_id }} · {{ workspace.shoe.brand }} {{ workspace.shoe.model_name }}</span>
+</nav>
+
+{% if flash_success %}
+<div class="mb-6 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-sm px-4 py-3">
+    {{ flash_success }}
+</div>
+{% endif %}
+
+{% if flash_error %}
+<div class="mb-6 rounded-xl bg-red-50 border border-red-200 text-red-800 text-sm px-4 py-3">
+    {{ flash_error }}
+</div>
+{% endif %}
+
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+    <div class="lg:col-span-5 space-y-6">
+        <section class="bg-white border border-stone-200 rounded-2xl p-6">
+            <div class="flex items-center justify-between mb-3">
+                <span class="text-xs font-mono text-stone-500">ID #{{ workspace.shoe.product_id }}</span>
+                <span class="text-xs font-semibold px-2.5 py-1 rounded-md bg-stone-100 text-stone-800">
+                    {{ workspace.shoe.process_status }}
+                </span>
+            </div>
+            <h1 class="text-xl font-semibold text-stone-900 mb-4">
+                {{ workspace.shoe.brand }} {{ workspace.shoe.model_name }}
+            </h1>
+            <dl class="space-y-2.5 text-sm">
+                <div class="flex justify-between">
+                    <dt class="text-stone-500">Ukuran</dt>
+                    <dd class="font-medium">EU {{ workspace.shoe.size_eu or '-' }}</dd>
+                </div>
+                <div class="flex justify-between">
+                    <dt class="text-stone-500">Lama Pemakaian</dt>
+                    <dd class="font-medium">{{ workspace.shoe.usage_duration }}</dd>
+                </div>
+                <div class="flex justify-between">
+                    <dt class="text-stone-500">Harga Beli Awal</dt>
+                    <dd class="font-medium">{{ workspace.shoe.purchase_price | rupiah }}</dd>
+                </div>
+                <div class="flex justify-between">
+                    <dt class="text-stone-500">Harga Baru Referensi</dt>
+                    <dd class="font-medium">{{ workspace.shoe.reference_new_price | rupiah }}</dd>
+                </div>
+                <div class="flex justify-between">
+                    <dt class="text-stone-500">Bukti Originalitas</dt>
+                    <dd class="font-medium">{{ workspace.shoe.originality_status | replace('_', ' ') | title }}</dd>
+                </div>
+            </dl>
+        </section>
+
+        <section class="bg-white border border-stone-200 rounded-2xl p-6">
+            <h2 class="text-base font-semibold text-stone-900 mb-1">1. Physical Verification Gate (BR-001)</h2>
+            <p class="text-xs text-stone-500 mb-4">
+                Sepatu tidak boleh masuk ke penilaian AI sebelum petugas COE memverifikasi kondisi fisik dan keasliannya secara langsung.
+            </p>
+            <form method="post" action="/admin/shoes/{{ workspace.shoe.product_id }}/verify" class="space-y-4">
+                <label class="flex items-start gap-3 p-3 rounded-xl bg-stone-50 border border-stone-200 cursor-pointer">
+                    <input
+                        type="checkbox"
+                        name="physical_verified"
+                        {% if workspace.shoe.physical_verified %}checked{% endif %}
+                        class="mt-0.5 h-4 w-4 rounded border-stone-300 text-emerald-700 focus:ring-emerald-600"
+                    />
+                    <span class="text-sm text-stone-800">
+                        Saya menyatakan sepatu ini telah <strong>lolos verifikasi fisik &amp; bukti originalitas</strong>.
+                    </span>
+                </label>
+
+                <div>
+                    <label for="verification_notes" class="block text-xs font-medium text-stone-700 mb-1">
+                        Catatan Pemeriksaan Internal (tidak tampil di publik)
+                    </label>
+                    <textarea
+                        id="verification_notes"
+                        name="verification_notes"
+                        rows="3"
+                        placeholder="Catatan kondisi fisik, jahitan, tag, atau struk..."
+                        class="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                    >{{ workspace.shoe.verification_notes }}</textarea>
+                </div>
+
+                <button
+                    type="submit"
+                    class="w-full rounded-xl bg-stone-900 text-white text-sm font-medium py-2.5 hover:bg-stone-800 transition"
+                >
+                    Simpan Status Verifikasi Fisik
+                </button>
+            </form>
+        </section>
+    </div>
+
+    <div class="lg:col-span-7 space-y-6">
+        <section class="bg-white border border-stone-200 rounded-2xl p-6">
+            <div class="flex items-center justify-between gap-2 mb-2">
+                <h2 class="text-base font-semibold text-stone-900">2. Foto 4 Sisi Wajib (FR-006 &amp; FR-007)</h2>
+                {% if workspace.photos_complete %}
+                <span class="text-xs font-medium text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md">4/4 Lengkap</span>
+                {% else %}
+                <span class="text-xs font-medium text-amber-700 bg-amber-50 px-2.5 py-1 rounded-md">
+                    Kurang {{ workspace.missing_angles | length }} sisi
+                </span>
+                {% endif %}
+            </div>
+            <p class="text-xs text-stone-500 mb-5">
+                Unggah foto dari alat pemotret atau perangkat lokal (JPG, PNG, WEBP, maks. 8 MB per sisi).
+            </p>
+
+            <form method="post" action="/admin/shoes/{{ workspace.shoe.product_id }}/photos" enctype="multipart/form-data" class="space-y-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {% for angle in required_angles %}
+                    {% set existing = workspace.photo_map.get(angle) %}
+                    <div class="border {% if existing %}border-emerald-200 bg-emerald-50/30{% else %}border-amber-200 bg-amber-50/30{% endif %} rounded-xl p-3.5">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-semibold text-stone-800">{{ angle_labels[angle] }}</span>
+                            {% if existing %}
+                            <span class="text-[11px] font-medium text-emerald-700">Tersedia</span>
+                            {% else %}
+                            <span class="text-[11px] font-medium text-amber-700">Belum diunggah</span>
+                            {% endif %}
+                        </div>
+
+                        {% if existing %}
+                        <div class="aspect-[4/3] bg-stone-100 rounded-lg overflow-hidden mb-2.5">
+                            <img src="{{ existing.file_path }}" alt="{{ angle_labels[angle] }}" class="w-full h-full object-cover" />
+                        </div>
+                        {% endif %}
+
+                        <input
+                            type="file"
+                            name="{{ angle }}"
+                            accept="image/jpeg,image/png,image/webp"
+                            class="block w-full text-xs text-stone-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-stone-900 file:text-white hover:file:bg-stone-800"
+                        />
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <button
+                    type="submit"
+                    class="rounded-xl bg-stone-900 text-white text-sm font-medium px-5 py-2.5 hover:bg-stone-800 transition"
+                >
+                    Unggah &amp; Validasi Foto
+                </button>
+            </form>
+        </section>
+
+        <section class="bg-white border border-stone-200 rounded-2xl p-6">
+            <h2 class="text-base font-semibold text-stone-900 mb-2">3. Kesiapan Inferensi CNN &amp; Rule Engine</h2>
+            {% if workspace.ready_for_ai %}
+            <div class="rounded-xl bg-emerald-50 border border-emerald-200 p-4 text-sm text-emerald-900">
+                <p class="font-medium mb-1">Syarat lengkap — siap dinilai pada Step 4</p>
+                <p class="text-xs text-emerald-800">
+                    Verifikasi fisik sudah lolos dan keempat foto sisi valid. Tombol jalankan inferensi CNN + perhitungan grade/harga otomatis akan aktif di Step 4.
+                </p>
+            </div>
+            {% else %}
+            <div class="rounded-xl bg-amber-50 border border-amber-200 p-4 text-sm text-amber-900">
+                <p class="font-medium mb-1">Belum dapat menjalankan penilaian final</p>
+                <ul class="list-disc pl-5 text-xs space-y-1 text-amber-800">
+                    {% if not workspace.shoe.physical_verified %}
+                    <li>Centang dan simpan <strong>Physical Verification Gate</strong> terlebih dahulu (BR-001).</li>
+                    {% endif %}
+                    {% if not workspace.photos_complete %}
+                    <li>Lengkapi foto sisi yang masih kurang:
+                        <strong>{% for a in workspace.missing_angles %}{{ angle_labels[a] }}{% if not loop.last %}, {% endif %}{% endfor %}</strong> (FR-007).
+                    </li>
+                    {% endif %}
+                </ul>
+            </div>
+            {% endif %}
+        </section>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+
+{% block title %}Katalog Sepatu — {{ app_name }}{% endblock %}
+
+{% block content %}
+<section class="mb-8">
+    <p class="text-xs font-medium uppercase tracking-widest text-emerald-700 mb-2">
+        COE Telkom University Surabaya
+    </p>
+    <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+            <h1 class="text-3xl sm:text-4xl font-semibold tracking-tight text-stone-900 mb-2">
+                Katalog Sepatu Terkurasi
+            </h1>
+            <p class="text-stone-600 max-w-2xl text-sm sm:text-base leading-relaxed">
+                Setiap sepatu telah melewati verifikasi fisik, pemeriksaan 4 sisi foto, serta penilaian grade dan harga secara transparan oleh tim COE.
+            </p>
+        </div>
+        <div class="text-sm text-stone-500 shrink-0">
+            Menampilkan <span class="font-semibold text-stone-900">{{ shoes|length }}</span> produk lolos kurasi
+        </div>
+    </div>
+</section>
+
+<section class="bg-white border border-stone-200 rounded-2xl p-4 sm:p-5 mb-8">
+    <form method="get" action="/catalog" class="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+        <div class="md:col-span-5">
+            <label for="q" class="sr-only">Cari merek atau model</label>
+            <input
+                id="q"
+                name="q"
+                type="text"
+                value="{{ q }}"
+                placeholder="Cari merek atau model (mis. Nike, New Balance)..."
+                class="w-full rounded-xl border border-stone-300 px-4 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600"
+            />
+        </div>
+
+        <div class="md:col-span-3">
+            <label for="grade" class="sr-only">Filter Grade</label>
+            <select
+                id="grade"
+                name="grade"
+                class="w-full rounded-xl border border-stone-300 bg-white px-3.5 py-2.5 text-sm text-stone-800 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600"
+            >
+                <option value="">Semua Grade (A, B, C)</option>
+                {% for g in allowed_grades %}
+                <option value="{{ g }}" {% if selected_grade == g %}selected{% endif %}>Grade {{ g }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="md:col-span-2">
+            <label for="sort" class="sr-only">Urutkan</label>
+            <select
+                id="sort"
+                name="sort"
+                class="w-full rounded-xl border border-stone-300 bg-white px-3.5 py-2.5 text-sm text-stone-800 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600"
+            >
+                <option value="newest" {% if selected_sort == 'newest' %}selected{% endif %}>Terbaru</option>
+                <option value="price_asc" {% if selected_sort == 'price_asc' %}selected{% endif %}>Harga Terendah</option>
+                <option value="price_desc" {% if selected_sort == 'price_desc' %}selected{% endif %}>Harga Tertinggi</option>
+            </select>
+        </div>
+
+        <div class="md:col-span-2 flex gap-2">
+            <button
+                type="submit"
+                class="flex-1 rounded-xl bg-stone-900 text-white text-sm font-medium px-4 py-2.5 hover:bg-stone-800 transition"
+            >
+                Terapkan
+            </button>
+            {% if q or selected_grade or selected_sort != 'newest' %}
+            <a
+                href="/catalog"
+                class="rounded-xl border border-stone-300 text-stone-700 text-sm px-3 py-2.5 hover:bg-stone-100 transition"
+                title="Reset filter"
+            >
+                Reset
+            </a>
+            {% endif %}
+        </div>
+    </form>
+</section>
+
+{% if shoes %}
+<section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-14">
+    {% for shoe in shoes %}
+    <article class="group bg-white border border-stone-200 rounded-2xl overflow-hidden hover:border-stone-300 hover:shadow-sm transition flex flex-col">
+        <a href="/catalog/{{ shoe.product_id }}" class="block bg-stone-100 aspect-[4/3] overflow-hidden relative">
+            <img
+                src="{{ shoe.cover_photo or '/static/img/placeholder-right.svg' }}"
+                alt="{{ shoe.brand }} {{ shoe.model_name }}"
+                class="w-full h-full object-cover group-hover:scale-[1.02] transition duration-300"
+            />
+            <span class="absolute top-3 left-3 text-xs font-semibold px-2.5 py-1 rounded-lg
+                {% if shoe.grade == 'A' %}bg-emerald-700 text-white
+                {% elif shoe.grade == 'B' %}bg-amber-600 text-white
+                {% else %}bg-stone-700 text-white{% endif %}">
+                Grade {{ shoe.grade }}
+            </span>
+        </a>
+
+        <div class="p-5 flex-1 flex flex-col justify-between gap-4">
+            <div>
+                <p class="text-xs font-medium uppercase tracking-wider text-stone-500 mb-1">
+                    {{ shoe.brand }}{% if shoe.size_eu %} · EU {{ shoe.size_eu }}{% endif %}
+                </p>
+                <h2 class="text-base font-semibold text-stone-900 leading-snug mb-1.5">
+                    <a href="/catalog/{{ shoe.product_id }}" class="hover:text-emerald-700 transition">
+                        {{ shoe.model_name or shoe.brand }}
+                    </a>
+                </h2>
+                <p class="text-xs text-stone-500">
+                    Kondisi {{ shoe.condition_label or 'Terkurasi' }} · Pemakaian {{ shoe.usage_duration }}
+                </p>
+            </div>
+
+            <div class="pt-3 border-t border-stone-100 flex items-end justify-between">
+                <div>
+                    <p class="text-lg font-semibold text-stone-900">{{ shoe.price | rupiah }}</p>
+                    <p class="text-xs text-stone-400 line-through">{{ shoe.reference_new_price | rupiah }}</p>
+                </div>
+                <a
+                    href="/catalog/{{ shoe.product_id }}"
+                    class="text-xs font-medium text-emerald-700 hover:text-emerald-800 px-3 py-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 transition"
+                >
+                    Lihat 4 Sisi →
+                </a>
+            </div>
+        </div>
+    </article>
+    {% endfor %}
+</section>
+{% else %}
+<section class="bg-white border border-stone-200 rounded-2xl p-10 text-center mb-14">
+    <h2 class="text-base font-semibold text-stone-900 mb-1">Belum ada sepatu yang sesuai filter</h2>
+    <p class="text-sm text-stone-500 mb-4">
+        Coba ubah kata kunci pencarian atau pilih semua grade untuk melihat koleksi yang tersedia.
+    </p>
+    <a href="/catalog" class="inline-block rounded-xl bg-stone-900 text-white text-sm font-medium px-4 py-2 hover:bg-stone-800 transition">
+        Tampilkan Semua Produk
+    </a>
+</section>
+{% endif %}
+
+<section id="tentang-grade" class="bg-white border border-stone-200 rounded-2xl p-6 sm:p-8">
+    <h2 class="text-lg font-semibold text-stone-900 mb-2">Standar Grading Transparan Local Thrift</h2>
+    <p class="text-sm text-stone-600 mb-5 max-w-3xl">
+        Penentuan grade menggabungkan evaluasi visual 4 sisi foto dengan bobot merek, lama pemakaian, dan bukti originalitas. Sepatu dengan Grade D otomatis tidak ditayangkan di katalog publik.
+    </p>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+        <div class="p-4 rounded-xl bg-stone-50 border border-stone-200">
+            <p class="font-semibold text-emerald-700 mb-1">Grade A (Poin ≥ 80)</p>
+            <p class="text-stone-600 text-xs leading-relaxed">Kondisi sangat baik, minim lipatan/kikisan, struktur sangat prima.</p>
+        </div>
+        <div class="p-4 rounded-xl bg-stone-50 border border-stone-200">
+            <p class="font-semibold text-amber-700 mb-1">Grade B (Poin 65–79)</p>
+            <p class="text-stone-600 text-xs leading-relaxed">Kondisi baik dengan tanda pemakaian ringan yang wajar.</p>
+        </div>
+        <div class="p-4 rounded-xl bg-stone-50 border border-stone-200">
+            <p class="font-semibold text-stone-800 mb-1">Grade C (Poin 50–64)</p>
+            <p class="text-stone-600 text-xs leading-relaxed">Kondisi cukup layak pakai dengan penyesuaian harga ekonomis.</p>
+        </div>
+    </div>
+</section>
+{% endblock %}

@@ -1,12 +1,14 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
+from starlette.middleware.sessions import SessionMiddleware
 
-from app.config import APP_NAME, DATABASE_PATH, UPLOAD_DIR
+from app.config import APP_NAME, DATABASE_PATH, SECRET_KEY, UPLOAD_DIR
 from app.database import db_session, init_db
+from app.routers.admin import router as admin_router
+from app.routers.catalog import router as catalog_router
 
 APP_DIR = Path(__file__).resolve().parent
 
@@ -19,14 +21,24 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title=APP_NAME, lifespan=lifespan)
+app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY, same_site="lax")
 app.mount("/static", StaticFiles(directory=str(APP_DIR / "static")), name="static")
-templates = Jinja2Templates(directory=str(APP_DIR / "templates"))
+app.include_router(catalog_router)
+app.include_router(admin_router)
 
 
 @app.get("/health", response_class=JSONResponse)
 def health_check():
     with db_session() as conn:
         shoe_count = conn.execute("SELECT COUNT(*) AS cnt FROM shoes").fetchone()["cnt"]
+        published_count = conn.execute(
+            """
+            SELECT COUNT(*) AS cnt
+            FROM shoes s
+            JOIN evaluations e ON e.product_id = s.product_id
+            WHERE s.process_status = 'published' AND e.final_grade != 'D'
+            """
+        ).fetchone()["cnt"]
         active_rule = conn.execute(
             "SELECT version FROM system_rules WHERE is_active = 1 ORDER BY version DESC LIMIT 1"
         ).fetchone()
@@ -35,36 +47,6 @@ def health_check():
         "app": APP_NAME,
         "database": DATABASE_PATH.name,
         "total_shoes": shoe_count,
+        "published_shoes": published_count,
         "active_rule_version": active_rule["version"] if active_rule else None,
     }
-
-
-@app.get("/", response_class=HTMLResponse)
-def home(request: Request):
-    with db_session() as conn:
-        stats = {
-            "total_shoes": conn.execute("SELECT COUNT(*) AS cnt FROM shoes").fetchone()["cnt"],
-            "published_shoes": conn.execute(
-                """
-                SELECT COUNT(*) AS cnt
-                FROM shoes s
-                JOIN evaluations e ON e.product_id = s.product_id
-                WHERE s.process_status = 'published' AND e.final_grade != 'D'
-                """
-            ).fetchone()["cnt"],
-            "pending_review": conn.execute(
-                "SELECT COUNT(*) AS cnt FROM shoes WHERE process_status = 'pending_review'"
-            ).fetchone()["cnt"],
-            "active_rule": conn.execute(
-                "SELECT version FROM system_rules WHERE is_active = 1 ORDER BY version DESC LIMIT 1"
-            ).fetchone(),
-        }
-
-    return templates.TemplateResponse(
-        request=request,
-        name="index.html",
-        context={
-            "app_name": APP_NAME,
-            "stats": stats,
-        },
-    )
