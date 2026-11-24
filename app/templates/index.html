@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="mb-10">
+    <p class="text-xs font-medium uppercase tracking-widest text-emerald-700 mb-2">
+        Step 1 — Fondasi Sistem &amp; Basis Data Aktif
+    </p>
+    <h1 class="text-3xl sm:text-4xl font-semibold tracking-tight text-stone-900 mb-3">
+        Sistem Kurasi Sepatu Bekas Local Thrift
+    </h1>
+    <p class="text-stone-600 max-w-2xl leading-relaxed">
+        Fondasi FastAPI, Jinja2, Tailwind CSS, dan skema basis data SQLite (6 tabel sesuai SDD Kelompok 07)
+        sudah terhubung. Katalog publik, verifikasi admin, dan modul penilaian citra akan dibangun pada tahap berikutnya.
+    </p>
+</section>
+
+<section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+    <div class="bg-white border border-stone-200 rounded-xl p-5">
+        <p class="text-xs text-stone-500 mb-1">Total Data Sepatu</p>
+        <p class="text-2xl font-semibold text-stone-900">{{ stats.total_shoes }}</p>
+    </div>
+    <div class="bg-white border border-stone-200 rounded-xl p-5">
+        <p class="text-xs text-stone-500 mb-1">Tayang di Katalog (Non-Grade D)</p>
+        <p class="text-2xl font-semibold text-emerald-700">{{ stats.published_shoes }}</p>
+    </div>
+    <div class="bg-white border border-stone-200 rounded-xl p-5">
+        <p class="text-xs text-stone-500 mb-1">Menunggu Review Admin</p>
+        <p class="text-2xl font-semibold text-amber-700">{{ stats.pending_review }}</p>
+    </div>
+    <div class="bg-white border border-stone-200 rounded-xl p-5">
+        <p class="text-xs text-stone-500 mb-1">Versi Aturan Aktif</p>
+        <p class="text-2xl font-semibold text-stone-900">
+            {% if stats.active_rule %}v{{ stats.active_rule.version }}{% else %}-{% endif %}
+        </p>
+    </div>
+</section>
+
+<section class="bg-white border border-stone-200 rounded-xl p-6">
+    <h2 class="text-base font-semibold text-stone-900 mb-3">Skema Tabel SDD yang Sudah Aktif</h2>
+    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm text-stone-700">
+        <div class="px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg font-mono">admins</div>
+        <div class="px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg font-mono">system_rules</div>
+        <div class="px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg font-mono">shoes</div>
+        <div class="px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg font-mono">shoe_photos</div>
+        <div class="px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg font-mono">evaluations</div>
+        <div class="px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg font-mono">audit_logs</div>
+    </div>
+</section>
+{% endblock %}
