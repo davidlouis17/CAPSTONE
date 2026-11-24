@@ -1,8 +1,10 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.config import APP_NAME, DATABASE_PATH, SECRET_KEY, UPLOAD_DIR
@@ -12,6 +14,7 @@ from app.routers.admin_governance import router as governance_router
 from app.routers.catalog import router as catalog_router
 
 APP_DIR = Path(__file__).resolve().parent
+error_templates = Jinja2Templates(directory=str(APP_DIR / "templates"))
 
 
 @asynccontextmanager
@@ -27,6 +30,21 @@ app.mount("/static", StaticFiles(directory=str(APP_DIR / "static")), name="stati
 app.include_router(catalog_router)
 app.include_router(admin_router)
 app.include_router(governance_router)
+
+
+@app.exception_handler(StarletteHTTPException)
+async def custom_http_exception_handler(request: Request, exc: StarletteHTTPException):
+    """Tangani 404/403 (termasuk route yang tidak cocok) dengan halaman HTML kustom."""
+    if request.url.path.startswith("/api/"):
+        return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+    if exc.status_code in (403, 404):
+        return error_templates.TemplateResponse(
+            request=request,
+            name=f"errors/{exc.status_code}.html",
+            context={"app_name": APP_NAME, "detail": exc.detail},
+            status_code=exc.status_code,
+        )
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
 
 @app.get("/health", response_class=JSONResponse)

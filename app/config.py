@@ -10,6 +10,7 @@ APP_NAME = os.getenv("APP_NAME", "Local Thrift")
 APP_ENV = os.getenv("APP_ENV", "development")
 DEBUG = os.getenv("DEBUG", "true").lower() == "true"
 SECRET_KEY = os.getenv("SECRET_KEY", "local-thrift-dev-secret-key-ubah-di-produksi")
+COE_WHATSAPP_NUMBER = os.getenv("COE_WHATSAPP_NUMBER", "6281234567890")
 
 _raw_db_url = os.getenv("DATABASE_URL", "sqlite:///./local_thrift.db")
 if _raw_db_url.startswith("sqlite:///"):

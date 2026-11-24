@@ -3,95 +3,125 @@
 {% block title %}Dasbor Admin — {{ app_name }}{% endblock %}
 
 {% block content %}
-<div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
+<div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-6 border-b border-neutral-200 mb-8">
     <div>
-        <p class="text-xs font-medium uppercase tracking-widest text-emerald-700 mb-1">
-            {{ admin.name }} ({{ admin.role }})
+        <p class="font-mono-num text-[11px] uppercase tracking-wider text-neutral-500 mb-1">
+            {{ admin.name }} · {{ admin.role }}
         </p>
-        <h1 class="text-2xl sm:text-3xl font-semibold tracking-tight text-stone-900">
+        <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-neutral-950">
             Dasbor Kurasi Sepatu
         </h1>
     </div>
-    <a
-        href="/admin/shoes/new"
-        class="inline-flex items-center justify-center rounded-xl bg-stone-900 text-white text-sm font-medium px-4 py-2.5 hover:bg-stone-800 transition"
-    >
-        + Input Sepatu Baru
-    </a>
+    <div class="flex flex-wrap items-center gap-2.5">
+        <a
+            href="/admin/export/shoes.csv"
+            class="border border-neutral-300 text-neutral-800 text-xs font-medium uppercase tracking-wider px-4 py-2.5 hover:border-neutral-950 hover:text-neutral-950 transition"
+        >
+            Ekspor CSV Produk
+        </a>
+        <a
+            href="/admin/shoes/new"
+            class="bg-neutral-950 text-white text-xs font-medium uppercase tracking-wider px-4 py-2.5 hover:bg-neutral-800 transition"
+        >
+            + Input Sepatu Baru
+        </a>
+    </div>
 </div>
 
-<section class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-    <div class="bg-white border border-stone-200 rounded-xl p-5">
-        <p class="text-xs text-stone-500 mb-1">Total Sepatu</p>
-        <p class="text-2xl font-semibold text-stone-900">{{ counts.total }}</p>
+<!-- Ringkasan Angka -->
+<section class="grid grid-cols-2 lg:grid-cols-4 border-t border-l border-neutral-200 mb-8">
+    <div class="p-5 border-r border-b border-neutral-200">
+        <p class="text-xs text-neutral-500 mb-1">Total Sepatu</p>
+        <p class="font-mono-num text-2xl font-medium text-neutral-950">{{ counts.total }}</p>
     </div>
-    <div class="bg-white border border-stone-200 rounded-xl p-5">
-        <p class="text-xs text-stone-500 mb-1">Draf / Verifikasi</p>
-        <p class="text-2xl font-semibold text-stone-700">{{ counts.draft }}</p>
+    <div class="p-5 border-r border-b border-neutral-200">
+        <p class="text-xs text-neutral-500 mb-1">Draf / Verifikasi</p>
+        <p class="font-mono-num text-2xl font-medium text-neutral-700">{{ counts.draft }}</p>
     </div>
-    <div class="bg-white border border-stone-200 rounded-xl p-5">
-        <p class="text-xs text-stone-500 mb-1">Menunggu Review</p>
-        <p class="text-2xl font-semibold text-amber-700">{{ counts.pending_review }}</p>
+    <div class="p-5 border-r border-b border-neutral-200">
+        <p class="text-xs text-neutral-500 mb-1">Menunggu Review</p>
+        <p class="font-mono-num text-2xl font-medium text-neutral-950">{{ counts.pending_review }}</p>
     </div>
-    <div class="bg-white border border-stone-200 rounded-xl p-5">
-        <p class="text-xs text-stone-500 mb-1">Tayang di Katalog</p>
-        <p class="text-2xl font-semibold text-emerald-700">{{ counts.published }}</p>
+    <div class="p-5 border-r border-b border-neutral-200">
+        <p class="text-xs text-neutral-500 mb-1">Tayang di Katalog</p>
+        <p class="font-mono-num text-2xl font-medium text-neutral-950">{{ counts.published }}</p>
     </div>
 </section>
 
-<section class="bg-white border border-stone-200 rounded-2xl overflow-hidden">
+<!-- Grafik Ringkasan Chart.js -->
+<section class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
+    <div class="border border-neutral-200 p-5">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-xs font-semibold uppercase tracking-wider text-neutral-950">Distribusi Grade (A / B / C / D)</h2>
+            <span class="font-mono-num text-[11px] text-neutral-400">HASIL KURASI</span>
+        </div>
+        <div class="h-52">
+            <canvas id="gradeChart"></canvas>
+        </div>
+    </div>
+    <div class="border border-neutral-200 p-5">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-xs font-semibold uppercase tracking-wider text-neutral-950">Status Alur Kurasi</h2>
+            <span class="font-mono-num text-[11px] text-neutral-400">PIPELINE</span>
+        </div>
+        <div class="h-52">
+            <canvas id="statusChart"></canvas>
+        </div>
+    </div>
+</section>
+
+<!-- Tabel Data Sepatu -->
+<section class="border border-neutral-200 overflow-hidden">
     <div class="overflow-x-auto">
         <table class="w-full text-left text-sm">
-            <thead class="bg-stone-50 border-b border-stone-200 text-xs uppercase text-stone-500">
+            <thead class="bg-neutral-50 border-b border-neutral-200 text-[11px] uppercase tracking-wider text-neutral-500">
                 <tr>
                     <th class="px-5 py-3.5">ID</th>
                     <th class="px-5 py-3.5">Sepatu</th>
-                    <th class="px-5 py-3.5">Verifikasi Fisik</th>
+                    <th class="px-5 py-3.5">Verifikasi</th>
                     <th class="px-5 py-3.5">Foto 4 Sisi</th>
                     <th class="px-5 py-3.5">Grade / Harga</th>
                     <th class="px-5 py-3.5">Status</th>
                     <th class="px-5 py-3.5 text-right">Aksi</th>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-stone-100">
+            <tbody class="divide-y divide-neutral-200">
                 {% for shoe in shoes %}
-                <tr class="hover:bg-stone-50/70">
-                    <td class="px-5 py-4 font-mono text-xs text-stone-500">#{{ shoe.product_id }}</td>
+                <tr class="hover:bg-neutral-50/70">
+                    <td class="px-5 py-4 font-mono-num text-xs text-neutral-500">#{{ shoe.product_id }}</td>
                     <td class="px-5 py-4">
-                        <p class="font-medium text-stone-900">{{ shoe.brand }} {{ shoe.model_name }}</p>
-                        <p class="text-xs text-stone-500">Ref. baru: {{ shoe.reference_new_price | rupiah }}</p>
+                        <p class="font-medium text-neutral-950">{{ shoe.brand }} {{ shoe.model_name }}</p>
+                        <p class="font-mono-num text-xs text-neutral-500">Ref. baru: {{ shoe.reference_new_price | rupiah }}</p>
                     </td>
                     <td class="px-5 py-4">
                         {% if shoe.physical_verified %}
-                        <span class="text-xs font-medium text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md">Lolos</span>
+                        <span class="font-mono-num text-[11px] px-2 py-0.5 border border-neutral-900 text-neutral-950">LOLOS</span>
                         {% else %}
-                        <span class="text-xs font-medium text-amber-700 bg-amber-50 px-2.5 py-1 rounded-md">Belum</span>
+                        <span class="font-mono-num text-[11px] px-2 py-0.5 border border-neutral-300 text-neutral-500">BELUM</span>
                         {% endif %}
                     </td>
-                    <td class="px-5 py-4">
-                        <span class="text-xs font-medium {% if shoe.valid_photo_count == 4 %}text-emerald-700{% else %}text-amber-700{% endif %}">
-                            {{ shoe.valid_photo_count }} / 4 foto
-                        </span>
+                    <td class="px-5 py-4 font-mono-num text-xs {% if shoe.valid_photo_count == 4 %}text-neutral-950{% else %}text-neutral-400{% endif %}">
+                        {{ shoe.valid_photo_count }} / 4
                     </td>
                     <td class="px-5 py-4">
                         {% if shoe.final_grade %}
-                        <span class="font-semibold text-stone-900">Grade {{ shoe.final_grade }}</span>
-                        <span class="block text-xs text-stone-500">{{ shoe.final_price | rupiah }}</span>
+                        <span class="font-mono-num text-xs font-medium text-neutral-950">Grade {{ shoe.final_grade }}</span>
+                        <span class="block font-mono-num text-xs text-neutral-500">{{ shoe.final_price | rupiah }}</span>
                         {% else %}
-                        <span class="text-xs text-stone-400">Belum dinilai</span>
+                        <span class="text-xs text-neutral-400">Belum dinilai</span>
                         {% endif %}
                     </td>
                     <td class="px-5 py-4">
-                        <span class="text-xs font-medium px-2.5 py-1 rounded-md bg-stone-100 text-stone-700">
+                        <span class="font-mono-num text-[11px] px-2 py-0.5 bg-neutral-100 text-neutral-800">
                             {{ shoe.process_status }}
                         </span>
                     </td>
                     <td class="px-5 py-4 text-right">
                         <a
                             href="/admin/shoes/{{ shoe.product_id }}"
-                            class="text-xs font-medium text-emerald-700 hover:text-emerald-800 px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 transition"
+                            class="text-xs font-medium text-neutral-950 underline underline-offset-4 hover:text-neutral-600"
                         >
-                            Kelola →
+                            Kelola
                         </a>
                     </td>
                 </tr>
@@ -100,4 +130,76 @@
         </table>
     </div>
 </section>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+const shoeRows = {{ shoes | tojson }};
+const gradeCounts = { A: 0, B: 0, C: 0, D: 0 };
+const statusCounts = { draft: 0, pending_review: 0, approved: 0, published: 0, rejected: 0, ml_failed: 0 };
+
+shoeRows.forEach((s) => {
+    if (s.final_grade && gradeCounts.hasOwnProperty(s.final_grade)) {
+        gradeCounts[s.final_grade] += 1;
+    }
+    if (s.process_status && statusCounts.hasOwnProperty(s.process_status)) {
+        statusCounts[s.process_status] += 1;
+    }
+});
+
+if (typeof Chart !== "undefined") {
+    new Chart(document.getElementById("gradeChart"), {
+        type: "bar",
+        data: {
+            labels: ["Grade A", "Grade B", "Grade C", "Grade D"],
+            datasets: [{
+                label: "Jumlah Sepatu",
+                data: [gradeCounts.A, gradeCounts.B, gradeCounts.C, gradeCounts.D],
+                backgroundColor: ["#111111", "#404040", "#737373", "#d4d4d4"],
+                borderRadius: 0,
+                barThickness: 36,
+            }],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: "#f0f0f0" } },
+                x: { grid: { display: false } },
+            },
+        },
+    });
+
+    new Chart(document.getElementById("statusChart"), {
+        type: "bar",
+        data: {
+            labels: ["Published", "Pending Review", "Approved (Hold)", "Draft", "Rejected", "ML Failed"],
+            datasets: [{
+                label: "Jumlah Sepatu",
+                data: [
+                    statusCounts.published,
+                    statusCounts.pending_review,
+                    statusCounts.approved,
+                    statusCounts.draft,
+                    statusCounts.rejected,
+                    statusCounts.ml_failed,
+                ],
+                backgroundColor: ["#111111", "#525252", "#737373", "#a3a3a3", "#d4d4d4", "#ef4444"],
+                borderRadius: 0,
+                barThickness: 18,
+            }],
+        },
+        options: {
+            indexAxis: "y",
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: "#f0f0f0" } },
+                y: { grid: { display: false } },
+            },
+        },
+    });
+}
+</script>
 {% endblock %}

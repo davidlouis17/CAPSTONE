@@ -1,8 +1,11 @@
+import csv
+from datetime import datetime, timedelta, timezone
+from io import StringIO
 import json
 from pathlib import Path
 from typing import Optional
 from fastapi import APIRouter, Form, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from app.auth import get_current_admin
@@ -15,7 +18,31 @@ APP_DIR = Path(__file__).resolve().parent.parent
 templates = Jinja2Templates(directory=str(APP_DIR / "templates"))
 templates.env.filters["rupiah"] = format_rupiah
 
-router = APIRouter(tags=["Audit & Aturan Bisnis"])
+WIB_TZ = timezone(timedelta(hours=7))
+MONTH_ID = (
+    "", "Jan", "Feb", "Mar", "Apr", "Mei", "Jun",
+    "Jul", "Agu", "Sep", "Okt", "Nov", "Des",
+)
+
+
+def format_wib(raw_ts: Optional[str]) -> str:
+    """Konversi timestamp UTC SQLite ('YYYY-MM-DD HH:MM:SS') ke format lokal WIB."""
+    if not raw_ts:
+        return "-"
+    text = str(raw_ts).strip()
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S.%f"):
+        try:
+            dt_utc = datetime.strptime(text, fmt).replace(tzinfo=timezone.utc)
+            dt_wib = dt_utc.astimezone(WIB_TZ)
+            return f"{dt_wib.day:02d} {MONTH_ID[dt_wib.month]} {dt_wib.year}, {dt_wib.strftime('%H:%M')} WIB"
+        except ValueError:
+            continue
+    return text
+
+
+templates.env.filters["wib"] = format_wib
+
+router = APIRouter(tags=["Audit, Aturan & Ekspor"])
 
 ACTION_TYPES = (
     "INPUT_DATA",
@@ -51,13 +78,125 @@ def _fetch_rules_history() -> list[dict]:
     return result
 
 
+@router.get("/admin/export/shoes.csv")
+def export_shoes_csv(request: Request):
+    guard = _require_admin_redirect(request)
+    if guard:
+        return guard
+
+    with db_session() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                s.product_id,
+                s.brand,
+                s.model_name,
+                s.size_eu,
+                s.usage_duration,
+                s.purchase_price,
+                s.reference_new_price,
+                s.originality_status,
+                s.physical_verified,
+                s.process_status,
+                e.condition_score,
+                e.total_points,
+                e.assigned_grade,
+                e.final_grade,
+                e.recommended_price,
+                e.final_price,
+                s.created_at
+            FROM shoes s
+            LEFT JOIN evaluations e ON e.evaluation_id = (
+                SELECT e2.evaluation_id
+                FROM evaluations e2
+                WHERE e2.product_id = s.product_id
+                ORDER BY e2.created_at DESC, e2.evaluation_id DESC
+                LIMIT 1
+            )
+            ORDER BY s.product_id ASC
+            """
+        ).fetchall()
+
+    buf = StringIO()
+    writer = csv.writer(buf)
+    writer.writerow([
+        "product_id", "brand", "model_name", "size_eu", "usage_duration",
+        "purchase_price", "reference_new_price", "originality_status",
+        "physical_verified", "process_status", "condition_score", "total_points",
+        "assigned_grade", "final_grade", "recommended_price", "final_price", "created_at_wib",
+    ])
+    for r in rows:
+        row_vals = [r[col] for col in r.keys()[:-1]]
+        row_vals.append(format_wib(r["created_at"]))
+        writer.writerow(row_vals)
+
+    return Response(
+        content=buf.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="local_thrift_shoes.csv"'},
+    )
+
+
+@router.get("/admin/export/audit.csv")
+def export_audit_csv(request: Request):
+    guard = _require_admin_redirect(request)
+    if guard:
+        return guard
+
+    with db_session() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                l.log_id,
+                l.timestamp,
+                a.name AS admin_name,
+                a.role AS admin_role,
+                l.product_id,
+                s.brand,
+                l.action_type,
+                l.old_value,
+                l.new_value,
+                l.correction_reason
+            FROM audit_logs l
+            JOIN admins a ON a.admin_id = l.admin_id
+            LEFT JOIN shoes s ON s.product_id = l.product_id
+            ORDER BY l.timestamp DESC, l.log_id DESC
+            """
+        ).fetchall()
+
+    buf = StringIO()
+    writer = csv.writer(buf)
+    writer.writerow([
+        "log_id", "timestamp", "admin_name", "admin_role", "product_id",
+        "brand", "action_type", "old_value", "new_value", "correction_reason",
+    ])
+    for r in rows:
+        writer.writerow([
+            r["log_id"],
+            format_wib(r["timestamp"]),
+            r["admin_name"],
+            r["admin_role"],
+            r["product_id"],
+            r["brand"],
+            r["action_type"],
+            r["old_value"],
+            r["new_value"],
+            r["correction_reason"],
+        ])
+
+    return Response(
+        content=buf.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="local_thrift_audit_logs.csv"'},
+    )
+
+
 @router.get("/admin/audit", response_class=HTMLResponse)
 def audit_log_page(
     request: Request,
     action_type: str = Query(default="", max_length=50),
     product_id: str = Query(default="", max_length=20),
 ):
-    """Halaman riwayat penilaian, koreksi, dan keputusan audit (FR-018, UI-005, TC-015)."""
     guard = _require_admin_redirect(request)
     if guard:
         return guard
@@ -116,7 +255,6 @@ def audit_log_page(
 
 @router.get("/admin/rules", response_class=HTMLResponse)
 def rules_page(request: Request, msg: str = "", err: str = ""):
-    """Halaman pengelolaan aturan bobot, batas grade, dan potongan harga (FR-019, NFR-009)."""
     guard = _require_admin_redirect(request)
     if guard:
         return guard
@@ -160,7 +298,6 @@ def update_rules_submit(
     rounding_unit: int = Form(...),
     change_reason: str = Form(...),
 ):
-    """Simpan versi baru aturan bisnis — khusus peran management (FR-019, NFR-002, NFR-009)."""
     guard = _require_admin_redirect(request)
     if guard:
         return guard
@@ -217,7 +354,7 @@ def update_rules_submit(
 
     with db_session() as conn:
         prev = conn.execute(
-            "SELECT version, criteria_weights, grade_thresholds, discount_percentage, rounding_unit FROM system_rules WHERE is_active = 1 ORDER BY version DESC LIMIT 1"
+            "SELECT version FROM system_rules WHERE is_active = 1 ORDER BY version DESC LIMIT 1"
         ).fetchone()
         max_ver = conn.execute("SELECT COALESCE(MAX(version), 0) AS mv FROM system_rules").fetchone()["mv"]
         next_ver = int(max_ver) + 1

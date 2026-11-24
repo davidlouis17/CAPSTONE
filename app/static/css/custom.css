@@ -1,4 +1,21 @@
-/* Gaya tambahan ringan untuk Local Thrift */
+/* Editorial Retail Styling — Local Thrift */
+:root {
+    --font-sans: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, monospace;
+}
+
+html {
+    scroll-behavior: smooth;
+    background: #ffffff;
+}
+
 body {
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    font-family: var(--font-sans);
+    color: #111111;
+    background: #ffffff;
+}
+
+.font-mono-num {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
 }

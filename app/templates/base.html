@@ -3,42 +3,94 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>{% block title %}{{ app_name }} — Kurasi Sepatu Bekas COE{% endblock %}</title>
+    <meta name="description" content="Local Thrift — Katalog sepatu bekas terkurasi oleh COE Telkom University Surabaya." />
+    <title>{% block title %}{{ app_name }}{% endblock %}</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23111111'/%3E%3Ctext x='50%25' y='54%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='26' font-weight='700' fill='%23ffffff'%3ELT%3C/text%3E%3C/svg%3E" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="/static/css/custom.css" />
 </head>
-<body class="bg-stone-50 text-stone-900 antialiased min-h-screen flex flex-col">
-    <header class="bg-white border-b border-stone-200 sticky top-0 z-20">
-        <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-            <a href="/" class="text-lg font-semibold tracking-tight text-stone-900">
-                Local Thrift
+<body class="bg-white text-neutral-950 antialiased min-h-screen flex flex-col">
+    <div class="border-b border-neutral-200 bg-neutral-950 text-neutral-200 text-[11px] tracking-wide">
+        <div class="max-w-7xl mx-auto px-5 sm:px-8 h-8 flex items-center justify-between">
+            <span>COE TELKOM UNIVERSITY SURABAYA · KURASI SEPATU BEKAS</span>
+            <span class="hidden sm:inline font-mono-num text-neutral-400">VERIFIKASI FISIK + 4 SISI FOTO</span>
+        </div>
+    </div>
+
+    <header class="bg-white border-b border-neutral-200 sticky top-0 z-30">
+        <div class="max-w-7xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between gap-6">
+            <a href="/" class="text-base font-bold tracking-[0.14em] uppercase text-neutral-950 shrink-0">
+                LOCAL THRIFT
             </a>
-            <nav class="flex items-center gap-5 text-sm text-stone-600">
-                <a href="/catalog" class="hover:text-stone-900 transition font-medium">Katalog</a>
+
+            <nav class="hidden md:flex items-center gap-7 text-[13px] text-neutral-600">
+                <a href="/catalog" class="hover:text-neutral-950 transition">Katalog</a>
+                <a href="/#panduan-grade" class="hover:text-neutral-950 transition">Panduan Grade</a>
                 {% if admin is defined and admin %}
-                <a href="/admin" class="hover:text-stone-900 transition font-medium">Dasbor</a>
-                <a href="/admin/audit" class="hover:text-stone-900 transition font-medium">Audit Log</a>
-                <a href="/admin/rules" class="hover:text-stone-900 transition font-medium">Aturan Bisnis</a>
+                <span class="h-3.5 w-px bg-neutral-300"></span>
+                <a href="/admin" class="text-neutral-950 font-medium underline underline-offset-4">Dasbor</a>
+                <a href="/admin/audit" class="hover:text-neutral-950 transition">Audit Log</a>
+                <a href="/admin/rules" class="hover:text-neutral-950 transition">Aturan</a>
                 <form method="post" action="/admin/logout" class="inline">
-                    <button type="submit" class="text-stone-500 hover:text-red-700 transition">Keluar</button>
+                    <button type="submit" class="text-neutral-500 hover:text-neutral-950 transition">Keluar</button>
                 </form>
                 {% else %}
-                <a href="/admin" class="px-3 py-1.5 rounded-lg border border-stone-300 text-stone-800 hover:bg-stone-100 transition font-medium">
-                    Panel Admin
+                <a href="/admin" class="text-neutral-950 font-medium hover:underline underline-offset-4">
+                    Masuk Admin
                 </a>
                 {% endif %}
             </nav>
+
+            <button
+                type="button"
+                onclick="document.getElementById('mobile-menu').classList.toggle('hidden')"
+                aria-label="Menu"
+                class="md:hidden p-1.5 text-neutral-900"
+            >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
+                    <path stroke-linecap="square" d="M4 7h16M4 12h16M4 17h16" />
+                </svg>
+            </button>
+        </div>
+
+        <div id="mobile-menu" class="hidden md:hidden border-t border-neutral-200 bg-white px-5 py-4 space-y-3 text-sm">
+            <a href="/catalog" class="block text-neutral-950 font-medium">Katalog</a>
+            <a href="/#panduan-grade" class="block text-neutral-600">Panduan Grade</a>
+            {% if admin is defined and admin %}
+            <div class="pt-3 border-t border-neutral-200 space-y-2.5">
+                <a href="/admin" class="block font-medium text-neutral-950">Dasbor Admin</a>
+                <a href="/admin/audit" class="block text-neutral-700">Audit Log</a>
+                <a href="/admin/rules" class="block text-neutral-700">Aturan Bisnis</a>
+                <form method="post" action="/admin/logout">
+                    <button type="submit" class="text-neutral-500">Keluar</button>
+                </form>
+            </div>
+            {% else %}
+            <div class="pt-3 border-t border-neutral-200">
+                <a href="/admin" class="block font-medium text-neutral-950">Masuk Admin</a>
+            </div>
+            {% endif %}
         </div>
     </header>
 
-    <main class="flex-1 max-w-6xl w-full mx-auto px-6 py-10">
+    <main class="flex-1 max-w-7xl w-full mx-auto px-5 sm:px-8 py-8 sm:py-10">
         {% block content %}{% endblock %}
     </main>
 
-    <footer class="border-t border-stone-200 bg-white mt-12">
-        <div class="max-w-6xl mx-auto px-6 py-6 text-xs text-stone-500 flex flex-col sm:flex-row justify-between gap-2">
-            <span>Local Thrift — Program Kurasi Sepatu Bekas COE Telkom University Surabaya</span>
-            <span>Penilaian kondisi visual 4 sisi · Penetapan grade &amp; harga transparan</span>
+    <footer class="border-t border-neutral-200 bg-white mt-20">
+        <div class="max-w-7xl mx-auto px-5 sm:px-8 py-10 flex flex-col sm:flex-row justify-between gap-6 text-xs text-neutral-500">
+            <div>
+                <p class="text-neutral-950 font-bold tracking-[0.12em] uppercase mb-1.5">LOCAL THRIFT</p>
+                <p>Program Kurasi Sepatu Bekas · COE Telkom University Surabaya</p>
+            </div>
+            <div class="flex flex-wrap gap-6 items-start">
+                <a href="/catalog" class="hover:text-neutral-950">Katalog</a>
+                <a href="/#panduan-grade" class="hover:text-neutral-950">Panduan Grade</a>
+                <a href="/admin" class="hover:text-neutral-950">Admin COE</a>
+            </div>
         </div>
     </footer>
 </body>

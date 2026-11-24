@@ -1,10 +1,12 @@
+import json
 from pathlib import Path
 from typing import Optional
+from urllib.parse import quote
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
-from app.config import APP_NAME
+from app.config import APP_NAME, COE_WHATSAPP_NUMBER
 from app.database import db_session
 
 APP_DIR = Path(__file__).resolve().parent.parent
@@ -30,10 +32,22 @@ ANGLE_LABELS = {
     "bottom": "Sisi Bawah (Sol)",
 }
 GRADE_DESCRIPTIONS = {
-    "A": "Kondisi sangat baik, minim tanda pemakaian, struktur dan sol masih sangat prima.",
-    "B": "Kondisi baik, terdapat tanda pemakaian ringan yang wajar dan tetap nyaman digunakan.",
+    "A": "Kondisi sangat baik, minim tanda pemakaian, struktur upper dan sol masih prima.",
+    "B": "Kondisi baik, terdapat tanda pemakaian ringan yang wajar dan tetap nyaman dipakai.",
     "C": "Kondisi cukup layak pakai dengan tanda pemakaian terlihat jelas, harga lebih ekonomis.",
 }
+CRITERIA_LABELS = (
+    ("condition", "Kondisi Visual (4 Sisi)"),
+    ("brand", "Kategori Merek"),
+    ("usage_duration", "Estimasi Pemakaian"),
+    ("originality", "Bukti Originalitas"),
+)
+
+
+def _calc_savings_pct(price: float, ref_price: float) -> int:
+    if not ref_price or ref_price <= 0 or price >= ref_price:
+        return 0
+    return int(round((1.0 - (float(price) / float(ref_price))) * 100.0))
 
 
 def _fetch_public_shoes(
@@ -68,7 +82,6 @@ def _fetch_public_shoes(
     }
     order_sql = order_map.get(sort, order_map["newest"])
 
-    # Hanya memilih kolom publik — tanpa data internal pemilik/admin (NFR-011)
     query = f"""
         SELECT
             s.product_id,
@@ -93,7 +106,20 @@ def _fetch_public_shoes(
                     ELSE 5
                 END
                 LIMIT 1
-            ) AS cover_photo
+            ) AS cover_photo,
+            (
+                SELECT p2.file_path
+                FROM shoe_photos p2
+                WHERE p2.product_id = s.product_id AND p2.is_valid = 1
+                ORDER BY CASE p2.angle_type
+                    WHEN 'left' THEN 1
+                    WHEN 'top' THEN 2
+                    WHEN 'bottom' THEN 3
+                    WHEN 'right' THEN 4
+                    ELSE 5
+                END
+                LIMIT 1
+            ) AS hover_photo
         FROM shoes s
         JOIN evaluations e ON e.evaluation_id = (
             SELECT e2.evaluation_id
@@ -108,14 +134,19 @@ def _fetch_public_shoes(
 
     with db_session(db_path) as conn:
         rows = conn.execute(query, params).fetchall()
-        return [dict(row) for row in rows]
+        items = []
+        for row in rows:
+            item = dict(row)
+            item["savings_pct"] = _calc_savings_pct(item["price"], item["reference_new_price"])
+            items.append(item)
+        return items
 
 
 def _fetch_public_shoe_detail(
     product_id: int,
     db_path: Optional[Path] = None,
 ) -> Optional[dict]:
-    """Ambil detail sepatu publik beserta 4 foto sudut (FR-017, BR-009, NFR-011)."""
+    """Ambil detail sepatu publik beserta 4 foto sudut & bar transparansi (FR-017, BR-009, NFR-011)."""
     query = """
         SELECT
             s.product_id,
@@ -127,9 +158,12 @@ def _fetch_public_shoe_detail(
             s.originality_status,
             e.final_grade AS grade,
             e.final_price AS price,
+            e.condition_score,
             e.condition_label,
+            e.criteria_breakdown,
             e.total_points,
-            e.rule_version
+            e.rule_version,
+            r.criteria_weights
         FROM shoes s
         JOIN evaluations e ON e.evaluation_id = (
             SELECT e2.evaluation_id
@@ -138,6 +172,7 @@ def _fetch_public_shoe_detail(
             ORDER BY e2.created_at DESC, e2.evaluation_id DESC
             LIMIT 1
         )
+        LEFT JOIN system_rules r ON r.version = e.rule_version
         WHERE s.product_id = ?
           AND s.process_status = 'published'
           AND e.final_grade != 'D'
@@ -154,9 +189,9 @@ def _fetch_public_shoe_detail(
             FROM shoe_photos
             WHERE product_id = ? AND is_valid = 1
             ORDER BY CASE angle_type
-                WHEN 'top' THEN 1
-                WHEN 'right' THEN 2
-                WHEN 'left' THEN 3
+                WHEN 'right' THEN 1
+                WHEN 'left' THEN 2
+                WHEN 'top' THEN 3
                 WHEN 'bottom' THEN 4
                 ELSE 5
             END
@@ -173,7 +208,43 @@ def _fetch_public_shoe_detail(
             }
             for p in photo_rows
         ]
+
+        # Bangun bar transparansi 4 kriteria tanpa membocorkan data internal admin (NFR-011)
+        try:
+            breakdown = json.loads(shoe.pop("criteria_breakdown") or "{}")
+        except json.JSONDecodeError:
+            breakdown = {}
+        try:
+            weights = json.loads(shoe.pop("criteria_weights") or "{}")
+        except json.JSONDecodeError:
+            weights = {"brand": 25, "condition": 40, "usage_duration": 20, "originality": 15}
+
+        transparency_bars = []
+        for key, label in CRITERIA_LABELS:
+            max_pts = float(weights.get(key, 25))
+            earned = float(breakdown.get(key, 0.0))
+            pct = int(round(max(0.0, min(100.0, (earned / max_pts) * 100.0)))) if max_pts > 0 else 0
+            transparency_bars.append(
+                {
+                    "key": key,
+                    "label": label,
+                    "earned": earned,
+                    "max_pts": max_pts,
+                    "pct": pct,
+                }
+            )
+
+        shoe["transparency_bars"] = transparency_bars
         shoe["grade_description"] = GRADE_DESCRIPTIONS.get(shoe["grade"], "")
+        shoe["savings_pct"] = _calc_savings_pct(shoe["price"], shoe["reference_new_price"])
+
+        wa_text = (
+            f"Halo Admin COE Local Thrift, saya tertarik dengan sepatu "
+            f"{shoe['brand']} {shoe['model_name']} (ID #{shoe['product_id']}, "
+            f"Ukuran EU {shoe['size_eu'] or '-'}, Grade {shoe['grade']}, "
+            f"Harga {format_rupiah(shoe['price'])}). Apakah masih tersedia?"
+        )
+        shoe["whatsapp_url"] = f"https://wa.me/{COE_WHATSAPP_NUMBER}?text={quote(wa_text)}"
         return shoe
 
 
@@ -186,12 +257,20 @@ def catalog_page(
     sort: str = Query(default="newest", max_length=20),
 ):
     shoes = _fetch_public_shoes(q=q, grade=grade, sort=sort)
+    all_published = _fetch_public_shoes() if (q.strip() or grade.strip()) else shoes
+    hero_stats = {
+        "total_published": len(all_published),
+        "grade_a_count": sum(1 for s in all_published if s["grade"] == "A"),
+        "min_price": min((s["price"] for s in all_published), default=0),
+    }
+
     return templates.TemplateResponse(
         request=request,
         name="catalog.html",
         context={
             "app_name": APP_NAME,
             "shoes": shoes,
+            "hero_stats": hero_stats,
             "q": q.strip(),
             "selected_grade": grade.strip().upper(),
             "selected_sort": sort,

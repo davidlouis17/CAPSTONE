@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}404 — {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto py-20 text-center">
+    <p class="font-mono-num text-xs text-neutral-400 mb-2">ERROR 404</p>
+    <h1 class="text-2xl font-bold tracking-tight text-neutral-950 mb-3">Produk atau Halaman Tidak Tersedia</h1>
+    <p class="text-sm text-neutral-500 mb-8 leading-relaxed">
+        {{ detail or "Halaman tidak ditemukan, atau sepatu tersebut belum memenuhi syarat tayang di katalog publik." }}
+    </p>
+    <a href="/catalog" class="inline-block bg-neutral-950 text-white text-xs font-medium uppercase tracking-widest px-6 py-3 hover:bg-neutral-800 transition">
+        Kembali ke Katalog
+    </a>
+</div>
+{% endblock %}

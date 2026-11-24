@@ -3,120 +3,293 @@
 {% block title %}{{ shoe.brand }} {{ shoe.model_name }} — {{ app_name }}{% endblock %}
 
 {% block content %}
-<nav class="text-xs text-stone-500 mb-6 flex items-center gap-2">
-    <a href="/catalog" class="hover:text-stone-900 transition">Katalog</a>
+<nav class="text-xs text-neutral-500 mb-6 flex items-center gap-2">
+    <a href="/catalog" class="hover:text-neutral-950">Katalog</a>
     <span>/</span>
-    <span class="text-stone-900 font-medium">{{ shoe.brand }} {{ shoe.model_name }}</span>
+    <span class="text-neutral-950">{{ shoe.brand }} {{ shoe.model_name }}</span>
 </nav>
 
-<div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
+    <!-- Galeri 4 Sisi + Trigger Lightbox Zoom -->
     <div class="lg:col-span-7">
-        <div class="bg-white border border-stone-200 rounded-2xl overflow-hidden mb-4">
-            <div class="aspect-[4/3] bg-stone-100 relative">
-                <img
-                    id="main-shoe-photo"
-                    src="{{ shoe.photos[0].file_path if shoe.photos else '/static/img/placeholder-top.svg' }}"
-                    alt="{{ shoe.brand }} {{ shoe.model_name }}"
-                    class="w-full h-full object-cover"
-                />
-                <span
-                    id="main-photo-label"
-                    class="absolute bottom-3 left-3 bg-stone-900/80 text-white text-xs px-3 py-1 rounded-lg"
-                >
-                    {{ shoe.photos[0].label if shoe.photos else 'Foto Sepatu' }}
-                </span>
-            </div>
+        <div class="relative aspect-[4/3] bg-[#F5F5F4] overflow-hidden mb-3 cursor-zoom-in group" onclick="openLightbox()">
+            <img
+                id="main-shoe-photo"
+                src="{{ shoe.photos[0].file_path if shoe.photos else '/static/img/placeholder-right.svg' }}"
+                alt="{{ shoe.brand }} {{ shoe.model_name }}"
+                class="w-full h-full object-cover transition duration-300 group-hover:scale-[1.015]"
+            />
+            <span
+                id="main-photo-label"
+                class="absolute bottom-3 left-3 font-mono-num text-[11px] bg-white/95 text-neutral-950 px-2.5 py-1 border border-neutral-200"
+            >
+                {{ shoe.photos[0].label if shoe.photos else 'Foto Sepatu' }}
+            </span>
+            <button
+                type="button"
+                onclick="event.stopPropagation(); openLightbox()"
+                class="absolute bottom-3 right-3 text-[11px] font-medium bg-neutral-950 text-white px-3 py-1.5 hover:bg-neutral-800 transition"
+            >
+                Perbesar / Zoom 4 Sisi
+            </button>
         </div>
 
         <div class="grid grid-cols-4 gap-3">
             {% for photo in shoe.photos %}
             <button
                 type="button"
-                onclick="selectShoePhoto('{{ photo.file_path }}', '{{ photo.label }}', this)"
-                class="angle-thumb text-left bg-white border {% if loop.first %}border-emerald-600 ring-2 ring-emerald-600/20{% else %}border-stone-200{% endif %} rounded-xl overflow-hidden hover:border-stone-400 transition"
+                data-idx="{{ loop.index0 }}"
+                onclick="selectShoePhoto({{ loop.index0 }}, this)"
+                class="angle-thumb text-left border-b-2 pb-1.5 transition {% if loop.first %}border-neutral-950{% else %}border-transparent hover:border-neutral-300{% endif %}"
             >
-                <div class="aspect-[4/3] bg-stone-100">
+                <div class="aspect-[4/3] bg-[#F5F5F4] overflow-hidden mb-1.5">
                     <img src="{{ photo.file_path }}" alt="{{ photo.label }}" class="w-full h-full object-cover" />
                 </div>
-                <p class="text-[11px] font-medium text-stone-700 px-2 py-1.5 truncate">{{ photo.label }}</p>
+                <p class="font-mono-num text-[11px] text-neutral-600 truncate">{{ photo.label }}</p>
             </button>
             {% endfor %}
         </div>
+
+        <p class="text-[11px] text-neutral-400 mt-3">
+            Klik foto utama untuk melihat perbesaran detail jahitan, toebox, dan ketebalan sol (dukung zoom 2×).
+        </p>
     </div>
 
-    <div class="lg:col-span-5 bg-white border border-stone-200 rounded-2xl p-6 sm:p-7">
-        <div class="flex items-center justify-between gap-2 mb-3">
-            <span class="text-xs font-semibold uppercase tracking-wider text-stone-500">{{ shoe.brand }}</span>
-            <span class="text-xs font-semibold px-3 py-1 rounded-lg
-                {% if shoe.grade == 'A' %}bg-emerald-700 text-white
-                {% elif shoe.grade == 'B' %}bg-amber-600 text-white
-                {% else %}bg-stone-700 text-white{% endif %}">
-                Grade {{ shoe.grade }}
-            </span>
+    <!-- Kolom Info Produk, Bar Transparansi Kondisi, & CTA WhatsApp -->
+    <div class="lg:col-span-5 lg:pl-4">
+        <div class="flex items-center justify-between text-xs uppercase tracking-wider text-neutral-500 mb-2">
+            <span>{{ shoe.brand }}</span>
+            <span class="font-mono-num text-neutral-950 font-medium uppercase">Grade {{ shoe.grade }}</span>
         </div>
 
-        <h1 class="text-2xl font-semibold tracking-tight text-stone-900 mb-4">
+        <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-neutral-950 mb-4">
             {{ shoe.model_name or shoe.brand }}
         </h1>
 
-        <div class="pb-5 mb-5 border-b border-stone-100">
-            <p class="text-xs text-stone-500 mb-1">Harga Jual Terkurasi</p>
-            <p class="text-3xl font-semibold text-stone-900">{{ shoe.price | rupiah }}</p>
-            <p class="text-xs text-stone-400 mt-1">
-                Harga referensi baru: <span class="line-through">{{ shoe.reference_new_price | rupiah }}</span>
-            </p>
+        <div class="flex items-baseline gap-3 pb-6 border-b border-neutral-200 mb-6">
+            <span class="font-mono-num text-2xl font-medium text-neutral-950">{{ shoe.price | rupiah }}</span>
+            <span class="font-mono-num text-sm text-neutral-400 line-through">{{ shoe.reference_new_price | rupiah }}</span>
+            {% if shoe.savings_pct > 0 %}
+            <span class="font-mono-num text-xs text-neutral-600">(-{{ shoe.savings_pct }}%)</span>
+            {% endif %}
         </div>
 
-        <dl class="space-y-3 text-sm mb-6">
-            <div class="flex justify-between gap-4">
-                <dt class="text-stone-500">Ukuran</dt>
-                <dd class="font-medium text-stone-900">EU {{ shoe.size_eu or '-' }}</dd>
+        <!-- Bar Transparansi Kondisi & Skor Kurasi -->
+        <section class="pb-6 border-b border-neutral-200 mb-6">
+            <div class="flex items-baseline justify-between mb-2">
+                <h2 class="text-xs font-semibold uppercase tracking-wider text-neutral-950">
+                    Transparansi Kondisi (Aturan v{{ shoe.rule_version }})
+                </h2>
+                <span class="font-mono-num text-sm font-medium text-neutral-950">
+                    {{ "%.1f"|format(shoe.total_points) }} / 100
+                </span>
             </div>
-            <div class="flex justify-between gap-4">
-                <dt class="text-stone-500">Kondisi Visual</dt>
-                <dd class="font-medium text-stone-900">{{ shoe.condition_label or 'Terkurasi' }}</dd>
+
+            <div class="w-full h-1.5 bg-neutral-200 mb-4 overflow-hidden">
+                <div class="h-full bg-neutral-950" style="width: {{ [shoe.total_points, 100]|min }}%;"></div>
             </div>
-            <div class="flex justify-between gap-4">
-                <dt class="text-stone-500">Estimasi Pemakaian</dt>
-                <dd class="font-medium text-stone-900">{{ shoe.usage_duration }}</dd>
+
+            {% if shoe.transparency_bars %}
+            <div class="space-y-2.5 mb-4">
+                {% for bar in shoe.transparency_bars %}
+                <div>
+                    <div class="flex items-center justify-between text-[11px] mb-1">
+                        <span class="text-neutral-600">{{ bar.label }}</span>
+                        <span class="font-mono-num text-neutral-900">{{ "%.1f"|format(bar.earned) }} / {{ bar.max_pts|int }}</span>
+                    </div>
+                    <div class="w-full h-1 bg-neutral-100 overflow-hidden">
+                        <div class="h-full bg-neutral-700" style="width: {{ bar.pct }}%;"></div>
+                    </div>
+                </div>
+                {% endfor %}
             </div>
-            <div class="flex justify-between gap-4">
-                <dt class="text-stone-500">Bukti Originalitas</dt>
-                <dd class="font-medium text-stone-900">{{ shoe.originality_status | replace('_', ' ') | title }}</dd>
+            {% endif %}
+
+            <p class="text-xs text-neutral-600 leading-relaxed">
+                {{ shoe.grade_description }} Penilaian mencakup 4 sisi luar sepatu yang telah diverifikasi fisik oleh petugas COE.
+            </p>
+        </section>
+
+        <dl class="divide-y divide-neutral-200 border-b border-neutral-200 text-sm mb-7">
+            <div class="py-2.5 flex justify-between gap-4">
+                <dt class="text-neutral-500">Ukuran</dt>
+                <dd class="font-mono-num text-neutral-950">EU {{ shoe.size_eu or '-' }}</dd>
             </div>
-            <div class="flex justify-between gap-4">
-                <dt class="text-stone-500">Skor Kurasi</dt>
-                <dd class="font-medium text-stone-900">{{ "%.1f"|format(shoe.total_points) }} / 100 (Aturan v{{ shoe.rule_version }})</dd>
+            <div class="py-2.5 flex justify-between gap-4">
+                <dt class="text-neutral-500">Kondisi Visual</dt>
+                <dd class="text-neutral-950">{{ shoe.condition_label or 'Terkurasi' }}</dd>
+            </div>
+            <div class="py-2.5 flex justify-between gap-4">
+                <dt class="text-neutral-500">Estimasi Pemakaian</dt>
+                <dd class="text-neutral-950">{{ shoe.usage_duration }}</dd>
+            </div>
+            <div class="py-2.5 flex justify-between gap-4">
+                <dt class="text-neutral-500">Bukti Originalitas</dt>
+                <dd class="text-neutral-950">{{ shoe.originality_status | replace('_', ' ') | title }}</dd>
             </div>
         </dl>
 
-        <div class="rounded-xl bg-stone-50 border border-stone-200 p-4 text-xs text-stone-600 leading-relaxed mb-6">
-            <p class="font-semibold text-stone-800 mb-1">Ringkasan Grade {{ shoe.grade }}</p>
-            <p>{{ shoe.grade_description }}</p>
-            <p class="mt-2 text-stone-500">
-                Catatan: penilaian citra mencakup 4 sisi luar sepatu (atas, kanan, kiri, bawah) yang telah diverifikasi fisik oleh tim COE.
-            </p>
+        <div class="space-y-3">
+            <a
+                href="{{ shoe.whatsapp_url }}"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="block w-full text-center bg-neutral-950 text-white text-xs font-medium uppercase tracking-widest py-3.5 hover:bg-neutral-800 transition"
+            >
+                Tanya / Pesan via WhatsApp COE
+            </a>
+            <div class="flex items-center justify-between pt-1 text-xs">
+                <button
+                    type="button"
+                    id="copy-link-btn"
+                    onclick="copyProductLink()"
+                    class="text-neutral-600 hover:text-neutral-950 underline underline-offset-4"
+                >
+                    Salin tautan produk
+                </button>
+                <a href="/catalog" class="text-neutral-600 hover:text-neutral-950 underline underline-offset-4">
+                    Kembali ke katalog
+                </a>
+            </div>
         </div>
+    </div>
+</div>
 
-        <a
-            href="/catalog"
-            class="block w-full text-center rounded-xl border border-stone-300 text-stone-800 text-sm font-medium px-4 py-2.5 hover:bg-stone-100 transition"
+<!-- Lightbox Fullscreen + Zoom 2x -->
+<div id="photo-lightbox" class="hidden fixed inset-0 z-50 bg-black/95 flex flex-col justify-between p-4 sm:p-6" onclick="closeLightbox()">
+    <div class="max-w-5xl w-full mx-auto flex items-center justify-between text-white text-xs font-mono-num" onclick="event.stopPropagation()">
+        <span id="lightbox-label"></span>
+        <div class="flex items-center gap-4">
+            <button type="button" id="zoom-toggle-btn" onclick="toggleLightboxZoom()" class="underline underline-offset-4 hover:text-neutral-300">
+                Zoom 2×
+            </button>
+            <button type="button" onclick="closeLightbox()" class="underline underline-offset-4 hover:text-neutral-300">
+                Tutup (Esc)
+            </button>
+        </div>
+    </div>
+
+    <div class="max-w-5xl w-full mx-auto relative flex-1 my-4 flex items-center justify-center overflow-hidden bg-neutral-950" onclick="event.stopPropagation()">
+        <img
+            id="lightbox-img"
+            src=""
+            alt="Perbesaran foto sepatu"
+            onclick="toggleLightboxZoom()"
+            class="max-h-[72vh] w-auto object-contain transition-transform duration-200 cursor-zoom-in select-none"
+        />
+        <button type="button" onclick="stepLightbox(-1)" aria-label="Foto sebelumnya" class="absolute left-3 top-1/2 -translate-y-1/2 bg-white text-neutral-950 px-3 py-2 text-sm font-medium hover:bg-neutral-200">
+            ←
+        </button>
+        <button type="button" onclick="stepLightbox(1)" aria-label="Foto berikutnya" class="absolute right-3 top-1/2 -translate-y-1/2 bg-white text-neutral-950 px-3 py-2 text-sm font-medium hover:bg-neutral-200">
+            →
+        </button>
+    </div>
+
+    <div class="max-w-md w-full mx-auto grid grid-cols-4 gap-2" onclick="event.stopPropagation()">
+        {% for photo in shoe.photos %}
+        <button
+            type="button"
+            data-lb-idx="{{ loop.index0 }}"
+            onclick="jumpLightbox({{ loop.index0 }})"
+            class="lb-thumb border border-transparent opacity-60 hover:opacity-100 transition overflow-hidden bg-neutral-900 aspect-[4/3]"
         >
-            ← Kembali ke Katalog
-        </a>
+            <img src="{{ photo.file_path }}" alt="{{ photo.label }}" class="w-full h-full object-cover" />
+        </button>
+        {% endfor %}
     </div>
 </div>
 
 <script>
-function selectShoePhoto(src, label, btn) {
-    document.getElementById("main-shoe-photo").src = src;
-    document.getElementById("main-photo-label").textContent = label;
+const shoePhotos = {{ shoe.photos | tojson }};
+let currentPhotoIdx = 0;
+let isZoomed = false;
+
+function selectShoePhoto(idx, btn) {
+    if (!shoePhotos.length) return;
+    currentPhotoIdx = idx;
+    const item = shoePhotos[idx];
+    document.getElementById("main-shoe-photo").src = item.file_path;
+    document.getElementById("main-photo-label").textContent = item.label;
     document.querySelectorAll(".angle-thumb").forEach((el) => {
-        el.classList.remove("border-emerald-600", "ring-2", "ring-emerald-600/20");
-        el.classList.add("border-stone-200");
+        el.classList.remove("border-neutral-950");
+        el.classList.add("border-transparent");
     });
-    btn.classList.remove("border-stone-200");
-    btn.classList.add("border-emerald-600", "ring-2", "ring-emerald-600/20");
+    if (btn) {
+        btn.classList.remove("border-transparent");
+        btn.classList.add("border-neutral-950");
+    }
 }
+
+function _applyZoomState() {
+    const img = document.getElementById("lightbox-img");
+    const btn = document.getElementById("zoom-toggle-btn");
+    if (isZoomed) {
+        img.classList.add("scale-150", "cursor-zoom-out");
+        img.classList.remove("cursor-zoom-in");
+        btn.textContent = "Reset Zoom";
+    } else {
+        img.classList.remove("scale-150", "cursor-zoom-out");
+        img.classList.add("cursor-zoom-in");
+        btn.textContent = "Zoom 2×";
+    }
+}
+
+function toggleLightboxZoom() {
+    isZoomed = !isZoomed;
+    _applyZoomState();
+}
+
+function openLightbox() {
+    if (!shoePhotos.length) return;
+    isZoomed = false;
+    _applyZoomState();
+    const item = shoePhotos[currentPhotoIdx];
+    document.getElementById("lightbox-img").src = item.file_path;
+    document.getElementById("lightbox-label").textContent = item.label.toUpperCase() + " (" + (currentPhotoIdx + 1) + "/" + shoePhotos.length + ")";
+    document.querySelectorAll(".lb-thumb").forEach((el, i) => {
+        if (i === currentPhotoIdx) {
+            el.classList.add("border-white", "opacity-100");
+            el.classList.remove("border-transparent", "opacity-60");
+        } else {
+            el.classList.remove("border-white", "opacity-100");
+            el.classList.add("border-transparent", "opacity-60");
+        }
+    });
+    document.getElementById("photo-lightbox").classList.remove("hidden");
+}
+
+function closeLightbox() {
+    isZoomed = false;
+    _applyZoomState();
+    document.getElementById("photo-lightbox").classList.add("hidden");
+}
+
+function jumpLightbox(idx) {
+    currentPhotoIdx = idx;
+    const thumb = document.querySelector(`.angle-thumb[data-idx="${currentPhotoIdx}"]`);
+    selectShoePhoto(currentPhotoIdx, thumb);
+    openLightbox();
+}
+
+function stepLightbox(delta) {
+    if (!shoePhotos.length) return;
+    jumpLightbox((currentPhotoIdx + delta + shoePhotos.length) % shoePhotos.length);
+}
+
+function copyProductLink() {
+    navigator.clipboard.writeText(window.location.href).then(() => {
+        const btn = document.getElementById("copy-link-btn");
+        btn.textContent = "Tautan tersalin";
+        setTimeout(() => { btn.textContent = "Salin tautan produk"; }, 2000);
+    });
+}
+
+document.addEventListener("keydown", (e) => {
+    const modal = document.getElementById("photo-lightbox");
+    if (modal.classList.contains("hidden")) return;
+    if (e.key === "Escape") closeLightbox();
+    if (e.key === "ArrowLeft") stepLightbox(-1);
+    if (e.key === "ArrowRight") stepLightbox(1);
+});
 </script>
 {% endblock %}
