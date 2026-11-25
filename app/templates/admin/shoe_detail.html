@@ -65,9 +65,17 @@
 <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
     <div class="lg:col-span-5 space-y-6">
         <section class="border border-neutral-200 p-6">
-            <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center justify-between gap-2 mb-3">
                 <span class="font-mono-num text-xs text-neutral-500">ID #{{ workspace.shoe.product_id }}</span>
-                <span class="font-mono-num text-[11px] px-2 py-0.5 bg-neutral-100 text-neutral-900">{{ workspace.shoe.process_status }}</span>
+                <div class="flex items-center gap-2">
+                    <span class="font-mono-num text-[11px] px-2 py-0.5 bg-neutral-100 text-neutral-900">{{ workspace.shoe.process_status }}</span>
+                    <a
+                        href="/admin/shoes/{{ workspace.shoe.product_id }}/label"
+                        class="font-mono-num text-[11px] px-2.5 py-0.5 border border-neutral-950 text-neutral-950 hover:bg-neutral-950 hover:text-white transition"
+                    >
+                        Cetak Label QR
+                    </a>
+                </div>
             </div>
             <h1 class="text-xl font-bold text-neutral-950 mb-4">
                 {{ workspace.shoe.brand }} {{ workspace.shoe.model_name }}
@@ -327,6 +335,36 @@
                     </form>
                 </div>
             </div>
+            {% endif %}
+        </section>
+
+        <!-- 4. Riwayat Audit Mini Produk -->
+        <section class="border border-neutral-200 p-6">
+            <div class="flex items-center justify-between gap-2 mb-4">
+                <h2 class="text-sm font-bold uppercase tracking-wider text-neutral-950">4. Riwayat Audit Produk</h2>
+                <a href="/admin/audit?product_id={{ workspace.shoe.product_id }}" class="text-xs text-neutral-600 hover:text-neutral-950 underline underline-offset-4">
+                    Lihat semua
+                </a>
+            </div>
+            {% if workspace.audit_history %}
+            <ol class="divide-y divide-neutral-200 border-t border-b border-neutral-200 text-xs">
+                {% for item in workspace.audit_history %}
+                <li class="py-3 space-y-1">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <span class="font-mono-num font-semibold text-neutral-950">{{ item.action_type }}</span>
+                        <span class="font-mono-num text-[11px] text-neutral-500">{{ item.timestamp | wib }}</span>
+                    </div>
+                    <p class="text-neutral-600">Oleh: <strong class="text-neutral-900">{{ item.admin_name }}</strong> ({{ item.admin_role }})</p>
+                    {% if item.correction_reason %}
+                    <p class="text-neutral-800 bg-neutral-50 border border-neutral-200 px-2.5 py-1.5">
+                        Alasan/Catatan: {{ item.correction_reason }}
+                    </p>
+                    {% endif %}
+                </li>
+                {% endfor %}
+            </ol>
+            {% else %}
+            <p class="text-xs text-neutral-500">Belum ada riwayat audit untuk produk ini.</p>
             {% endif %}
         </section>
     </div>

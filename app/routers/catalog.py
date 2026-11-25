@@ -50,13 +50,37 @@ def _calc_savings_pct(price: float, ref_price: float) -> int:
     return int(round((1.0 - (float(price) / float(ref_price))) * 100.0))
 
 
+def _fetch_available_sizes(db_path: Optional[Path] = None) -> list[str]:
+    """Ambil daftar ukuran EU unik yang tersedia di katalog publik."""
+    query = """
+        SELECT DISTINCT TRIM(s.size_eu) AS size_eu
+        FROM shoes s
+        JOIN evaluations e ON e.evaluation_id = (
+            SELECT e2.evaluation_id
+            FROM evaluations e2
+            WHERE e2.product_id = s.product_id
+            ORDER BY e2.created_at DESC, e2.evaluation_id DESC
+            LIMIT 1
+        )
+        WHERE s.process_status = 'published'
+          AND e.final_grade != 'D'
+          AND e.status = 'success'
+          AND TRIM(COALESCE(s.size_eu, '')) != ''
+        ORDER BY CAST(TRIM(s.size_eu) AS REAL) ASC, TRIM(s.size_eu) ASC
+    """
+    with db_session(db_path) as conn:
+        rows = conn.execute(query).fetchall()
+        return [r["size_eu"] for r in rows]
+
+
 def _fetch_public_shoes(
     q: str = "",
     grade: str = "",
+    size: str = "",
     sort: str = "newest",
     db_path: Optional[Path] = None,
 ) -> list[dict]:
-    """Ambil daftar sepatu publik yang disetujui & bukan Grade D (FR-016, BR-009, NFR-011)."""
+    """Ambil daftar sepatu publik yang disetujui & bukan Grade D (FR-016, FR-021, BR-009, NFR-011)."""
     conditions = [
         "s.process_status = 'published'",
         "e.final_grade != 'D'",
@@ -74,6 +98,11 @@ def _fetch_public_shoes(
     if cleaned_grade in ALLOWED_PUBLIC_GRADES:
         conditions.append("e.final_grade = ?")
         params.append(cleaned_grade)
+
+    cleaned_size = size.strip()
+    if cleaned_size:
+        conditions.append("TRIM(s.size_eu) = ?")
+        params.append(cleaned_size)
 
     order_map = {
         "newest": "s.created_at DESC, s.product_id DESC",
@@ -146,7 +175,6 @@ def _fetch_public_shoe_detail(
     product_id: int,
     db_path: Optional[Path] = None,
 ) -> Optional[dict]:
-    """Ambil detail sepatu publik beserta 4 foto sudut & bar transparansi (FR-017, BR-009, NFR-011)."""
     query = """
         SELECT
             s.product_id,
@@ -209,7 +237,6 @@ def _fetch_public_shoe_detail(
             for p in photo_rows
         ]
 
-        # Bangun bar transparansi 4 kriteria tanpa membocorkan data internal admin (NFR-011)
         try:
             breakdown = json.loads(shoe.pop("criteria_breakdown") or "{}")
         except json.JSONDecodeError:
@@ -254,15 +281,11 @@ def catalog_page(
     request: Request,
     q: str = Query(default="", max_length=100),
     grade: str = Query(default="", max_length=5),
+    size: str = Query(default="", max_length=20),
     sort: str = Query(default="newest", max_length=20),
 ):
-    shoes = _fetch_public_shoes(q=q, grade=grade, sort=sort)
-    all_published = _fetch_public_shoes() if (q.strip() or grade.strip()) else shoes
-    hero_stats = {
-        "total_published": len(all_published),
-        "grade_a_count": sum(1 for s in all_published if s["grade"] == "A"),
-        "min_price": min((s["price"] for s in all_published), default=0),
-    }
+    shoes = _fetch_public_shoes(q=q, grade=grade, size=size, sort=sort)
+    available_sizes = _fetch_available_sizes()
 
     return templates.TemplateResponse(
         request=request,
@@ -270,9 +293,10 @@ def catalog_page(
         context={
             "app_name": APP_NAME,
             "shoes": shoes,
-            "hero_stats": hero_stats,
+            "available_sizes": available_sizes,
             "q": q.strip(),
             "selected_grade": grade.strip().upper(),
+            "selected_size": size.strip(),
             "selected_sort": sort,
             "allowed_grades": ALLOWED_PUBLIC_GRADES,
         },
@@ -302,7 +326,8 @@ def catalog_detail_page(request: Request, product_id: int):
 def catalog_api(
     q: str = Query(default="", max_length=100),
     grade: str = Query(default="", max_length=5),
+    size: str = Query(default="", max_length=20),
     sort: str = Query(default="newest", max_length=20),
 ):
-    shoes = _fetch_public_shoes(q=q, grade=grade, sort=sort)
+    shoes = _fetch_public_shoes(q=q, grade=grade, size=size, sort=sort)
     return {"count": len(shoes), "items": shoes}

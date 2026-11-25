@@ -116,12 +116,18 @@
                             {{ shoe.process_status }}
                         </span>
                     </td>
-                    <td class="px-5 py-4 text-right">
+                    <td class="px-5 py-4 text-right whitespace-nowrap space-x-3">
                         <a
                             href="/admin/shoes/{{ shoe.product_id }}"
                             class="text-xs font-medium text-neutral-950 underline underline-offset-4 hover:text-neutral-600"
                         >
                             Kelola
+                        </a>
+                        <a
+                            href="/admin/shoes/{{ shoe.product_id }}/label"
+                            class="font-mono-num text-[11px] text-neutral-600 hover:text-neutral-950 underline underline-offset-4"
+                        >
+                            Label QR
                         </a>
                     </td>
                 </tr>

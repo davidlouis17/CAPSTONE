@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
 import json
 from pathlib import Path
@@ -7,7 +8,13 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from PIL import Image, UnidentifiedImageError
 
-from app.auth import authenticate_admin, get_current_admin
+from app.auth import (
+    authenticate_admin,
+    check_login_rate_limit,
+    clear_failed_logins,
+    get_current_admin,
+    record_failed_login,
+)
 from app.config import APP_NAME, UPLOAD_DIR
 from app.database import db_session
 from app.routers.catalog import ANGLE_LABELS, format_rupiah
@@ -17,6 +24,29 @@ from ml.shoe_evaluator import MLEvaluationError, evaluate_shoe_photos
 APP_DIR = Path(__file__).resolve().parent.parent
 templates = Jinja2Templates(directory=str(APP_DIR / "templates"))
 templates.env.filters["rupiah"] = format_rupiah
+
+WIB_TZ = timezone(timedelta(hours=7))
+MONTH_ID = (
+    "", "Jan", "Feb", "Mar", "Apr", "Mei", "Jun",
+    "Jul", "Agu", "Sep", "Okt", "Nov", "Des",
+)
+
+
+def _format_wib(raw_ts: Optional[str]) -> str:
+    if not raw_ts:
+        return "-"
+    text = str(raw_ts).strip()
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S.%f"):
+        try:
+            dt_utc = datetime.strptime(text, fmt).replace(tzinfo=timezone.utc)
+            dt_wib = dt_utc.astimezone(WIB_TZ)
+            return f"{dt_wib.day:02d} {MONTH_ID[dt_wib.month]} {dt_wib.year}, {dt_wib.strftime('%H:%M')} WIB"
+        except ValueError:
+            continue
+    return text
+
+
+templates.env.filters["wib"] = _format_wib
 
 router = APIRouter(tags=["Admin COE"])
 
@@ -124,6 +154,19 @@ def _get_shoe_workspace_data(product_id: int) -> Optional[dict]:
             (product_id,),
         ).fetchone()
 
+        audit_rows = conn.execute(
+            """
+            SELECT l.log_id, l.action_type, l.old_value, l.new_value,
+                   l.correction_reason, l.timestamp, a.name AS admin_name, a.role AS admin_role
+            FROM audit_logs l
+            JOIN admins a ON a.admin_id = l.admin_id
+            WHERE l.product_id = ?
+            ORDER BY l.timestamp DESC, l.log_id DESC
+            LIMIT 10
+            """,
+            (product_id,),
+        ).fetchall()
+
     missing_angles = [
         angle for angle in REQUIRED_ANGLES
         if angle not in photo_map or not photo_map[angle]["is_valid"]
@@ -143,6 +186,7 @@ def _get_shoe_workspace_data(product_id: int) -> Optional[dict]:
         "photos_complete": len(missing_angles) == 0,
         "ready_for_ai": bool(shoe["physical_verified"]) and len(missing_angles) == 0,
         "evaluation": evaluation,
+        "audit_history": [dict(r) for r in audit_rows],
     }
 
 
@@ -191,19 +235,41 @@ def login_submit(
     email: str = Form(...),
     password: str = Form(...),
 ):
-    admin = authenticate_admin(email, password)
-    if not admin:
+    client_ip = request.client.host if request.client else "unknown"
+    is_blocked, retry_after = check_login_rate_limit(client_ip, email)
+    if is_blocked:
+        mins = max(1, (retry_after + 59) // 60)
         return templates.TemplateResponse(
             request=request,
             name="admin/login.html",
             context={
                 "app_name": APP_NAME,
-                "error": "Email atau kata sandi tidak valid.",
+                "error": f"Terlalu banyak percobaan login gagal. Coba lagi dalam sekitar {mins} menit.",
+                "email": email.strip(),
+            },
+            status_code=429,
+        )
+
+    admin = authenticate_admin(email, password)
+    if not admin:
+        remaining = record_failed_login(client_ip, email)
+        err_msg = (
+            f"Email atau kata sandi tidak valid. Sisa percobaan: {remaining}."
+            if remaining > 0
+            else "Email atau kata sandi tidak valid. Akun dibatasi sementara selama 5 menit."
+        )
+        return templates.TemplateResponse(
+            request=request,
+            name="admin/login.html",
+            context={
+                "app_name": APP_NAME,
+                "error": err_msg,
                 "email": email.strip(),
             },
             status_code=401,
         )
 
+    clear_failed_logins(client_ip, email)
     request.session["admin_id"] = admin["admin_id"]
     request.session["admin_name"] = admin["name"]
     request.session["admin_role"] = admin["role"]
@@ -540,7 +606,6 @@ async def upload_shoe_photos(
 
 @router.post("/admin/shoes/{product_id}/evaluate")
 def run_shoe_evaluation(request: Request, product_id: int):
-    """Jalankan inferensi citra 4 sisi + rule engine deterministik (FR-008 s.d. FR-011, FR-022)."""
     guard = _require_admin_redirect(request)
     if guard:
         return guard
@@ -582,7 +647,6 @@ def run_shoe_evaluation(request: Request, product_id: int):
             reference_new_price=shoe["reference_new_price"],
         )
     except MLEvaluationError as exc:
-        # FR-022 / TC-014: gagal -> tandai ml_failed & jangan pernah publikasikan otomatis
         with db_session() as conn:
             conn.execute(
                 "UPDATE shoes SET process_status = 'ml_failed' WHERE product_id = ?",
@@ -660,7 +724,6 @@ def correct_evaluation(
     final_price: str = Form(...),
     correction_reason: str = Form(...),
 ):
-    """Koreksi manual grade/harga oleh admin dengan alasan wajib (FR-013, BR-007, TC-010)."""
     guard = _require_admin_redirect(request)
     if guard:
         return guard
@@ -703,7 +766,6 @@ def correct_evaluation(
 
     ev = workspace["evaluation"]
     with db_session() as conn:
-        # assigned_grade & recommended_price TIDAK diubah agar hasil asli sistem tetap terjaga (BR-007)
         conn.execute(
             "UPDATE evaluations SET final_grade = ?, final_price = ? WHERE evaluation_id = ?",
             (cleaned_grade, parsed_price, ev["evaluation_id"]),
@@ -728,7 +790,6 @@ def decide_publication(
     decision: str = Form(...),
     decision_note: str = Form(""),
 ):
-    """Persetujuan atau penolakan publikasi sepatu (FR-014, BR-008, BR-009, TC-011 s.d. TC-013)."""
     guard = _require_admin_redirect(request)
     if guard:
         return guard
@@ -749,7 +810,6 @@ def decide_publication(
     note = decision_note.strip() or None
 
     if decision == "approve":
-        # BR-009 / TC-013: Grade D disetujui secara internal tapi TIDAK dipublikasikan ke katalog publik
         if ev["final_grade"] == "D":
             new_status = "approved"
             msg_key = "approved_withheld"

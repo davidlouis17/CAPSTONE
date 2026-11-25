@@ -391,3 +391,59 @@ def update_rules_submit(
         )
 
     return RedirectResponse(url="/admin/rules?msg=updated", status_code=303)
+
+
+@router.get("/admin/shoes/{product_id}/label", response_class=HTMLResponse)
+def shoe_label_page(request: Request, product_id: int):
+    """Halaman cetak Hang Tag / Label Sepatu + QR Code ke /catalog/{id}."""
+    guard = _require_admin_redirect(request)
+    if guard:
+        return guard
+    admin = get_current_admin(request)
+
+    with db_session() as conn:
+        shoe_row = conn.execute(
+            """
+            SELECT
+                s.product_id,
+                s.brand,
+                s.model_name,
+                s.size_eu,
+                s.usage_duration,
+                s.reference_new_price,
+                s.process_status,
+                e.final_grade,
+                e.final_price,
+                e.total_points,
+                e.condition_label,
+                e.rule_version
+            FROM shoes s
+            LEFT JOIN evaluations e ON e.evaluation_id = (
+                SELECT e2.evaluation_id
+                FROM evaluations e2
+                WHERE e2.product_id = s.product_id
+                ORDER BY e2.created_at DESC, e2.evaluation_id DESC
+                LIMIT 1
+            )
+            WHERE s.product_id = ?
+            """,
+            (product_id,),
+        ).fetchone()
+
+    if not shoe_row:
+        raise HTTPException(status_code=404, detail="Data sepatu tidak ditemukan.")
+
+    shoe = dict(shoe_row)
+    base_url = str(request.base_url).rstrip("/")
+    catalog_url = f"{base_url}/catalog/{product_id}"
+
+    return templates.TemplateResponse(
+        request=request,
+        name="admin/shoe_label.html",
+        context={
+            "app_name": APP_NAME,
+            "admin": admin,
+            "shoe": shoe,
+            "catalog_url": catalog_url,
+        },
+    )

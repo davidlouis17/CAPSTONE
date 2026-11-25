@@ -22,14 +22,14 @@
 <section class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-8">
     <div class="flex items-center gap-5 border-b border-neutral-200 lg:border-b-0 pb-2 lg:pb-0 text-[13px] overflow-x-auto">
         <a
-            href="/catalog{% if q %}?q={{ q }}{% endif %}{% if selected_sort != 'newest' %}{% if q %}&{% else %}?{% endif %}sort={{ selected_sort }}{% endif %}"
+            href="/catalog?{% if q %}q={{ q }}&{% endif %}{% if selected_size %}size={{ selected_size }}&{% endif %}{% if selected_sort != 'newest' %}sort={{ selected_sort }}{% endif %}"
             class="whitespace-nowrap pb-1 transition {% if not selected_grade %}text-neutral-950 font-semibold border-b-2 border-neutral-950{% else %}text-neutral-500 hover:text-neutral-950{% endif %}"
         >
             Semua
         </a>
         {% for g in allowed_grades %}
         <a
-            href="/catalog?grade={{ g }}{% if q %}&q={{ q }}{% endif %}{% if selected_sort != 'newest' %}&sort={{ selected_sort }}{% endif %}"
+            href="/catalog?grade={{ g }}{% if q %}&q={{ q }}{% endif %}{% if selected_size %}&size={{ selected_size }}{% endif %}{% if selected_sort != 'newest' %}&sort={{ selected_sort }}{% endif %}"
             class="whitespace-nowrap pb-1 transition {% if selected_grade == g %}text-neutral-950 font-semibold border-b-2 border-neutral-950{% else %}text-neutral-500 hover:text-neutral-950{% endif %}"
         >
             Grade {{ g }}
@@ -46,10 +46,23 @@
             type="text"
             value="{{ q }}"
             placeholder="Cari merek atau model..."
-            class="flex-1 sm:w-64 border-b border-neutral-300 bg-transparent px-1 py-1.5 text-sm text-neutral-950 placeholder:text-neutral-400 focus:outline-none focus:border-neutral-950"
+            aria-label="Cari merek atau model"
+            class="flex-1 sm:w-52 border-b border-neutral-300 bg-transparent px-1 py-1.5 text-sm text-neutral-950 placeholder:text-neutral-400 focus:outline-none focus:border-neutral-950"
         />
         <select
+            name="size"
+            aria-label="Filter Ukuran EU"
+            onchange="this.form.submit()"
+            class="border-b border-neutral-300 bg-transparent py-1.5 text-sm text-neutral-700 font-mono-num focus:outline-none focus:border-neutral-950"
+        >
+            <option value="">Semua EU</option>
+            {% for sz in available_sizes %}
+            <option value="{{ sz }}" {% if selected_size == sz %}selected{% endif %}>EU {{ sz }}</option>
+            {% endfor %}
+        </select>
+        <select
             name="sort"
+            aria-label="Urutkan produk"
             onchange="this.form.submit()"
             class="border-b border-neutral-300 bg-transparent py-1.5 text-sm text-neutral-700 focus:outline-none focus:border-neutral-950"
         >
@@ -63,7 +76,7 @@
         >
             Cari
         </button>
-        {% if q or selected_grade or selected_sort != 'newest' %}
+        {% if q or selected_grade or selected_size or selected_sort != 'newest' %}
         <a href="/catalog" class="text-xs text-neutral-500 hover:text-neutral-950 underline underline-offset-4 px-1">
             Reset
         </a>
@@ -90,8 +103,8 @@
                 />
                 {% endif %}
 
-                <span class="absolute top-2.5 left-2.5 font-mono-num text-[11px] font-medium px-2 py-0.5 bg-white text-neutral-950 border border-neutral-200">
-                    GRADE {{ shoe.grade }}
+                <span class="absolute top-2.5 left-2.5 font-mono-num text-[11px] font-medium px-2 py-0.5 bg-white text-neutral-950 border border-neutral-200 uppercase">
+                    Grade {{ shoe.grade }}
                 </span>
                 {% if shoe.savings_pct > 0 %}
                 <span class="absolute top-2.5 right-2.5 font-mono-num text-[11px] px-2 py-0.5 bg-neutral-950 text-white">
@@ -122,7 +135,7 @@
 {% else %}
 <section class="py-16 border-t border-b border-neutral-200 text-center mb-20">
     <p class="text-base font-medium text-neutral-950 mb-1">Tidak ada sepatu yang cocok dengan filter ini.</p>
-    <p class="text-sm text-neutral-500 mb-5">Coba ganti kata kunci atau tampilkan seluruh grade.</p>
+    <p class="text-sm text-neutral-500 mb-5">Coba ganti kata kunci, ukuran EU, atau tampilkan seluruh grade.</p>
     <a href="/catalog" class="inline-block bg-neutral-950 text-white text-xs font-medium uppercase tracking-wider px-5 py-2.5 hover:bg-neutral-800 transition">
         Lihat Semua Koleksi
     </a>
