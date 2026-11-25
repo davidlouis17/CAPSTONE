@@ -11,8 +11,12 @@
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="/static/css/custom.css" />
+    <link rel="stylesheet" href="/static/css/accessibility.css" />
 </head>
 <body class="bg-white text-neutral-950 antialiased min-h-screen flex flex-col">
+    <a href="#main-content" class="skip-to-content">Langsung ke konten utama</a>
+    <div id="a11y-reading-guide" aria-hidden="true"></div>
+
     <div class="border-b border-neutral-200 bg-neutral-950 text-neutral-200 text-[11px] tracking-wide">
         <div class="max-w-7xl mx-auto px-5 sm:px-8 h-8 flex items-center justify-between">
             <span>COE TELKOM UNIVERSITY SURABAYA · KURASI SEPATU BEKAS</span>
@@ -26,7 +30,7 @@
                 LOCAL THRIFT
             </a>
 
-            <nav class="hidden md:flex items-center gap-7 text-[13px] text-neutral-600">
+            <nav class="hidden md:flex items-center gap-7 text-[13px] text-neutral-600" aria-label="Navigasi utama">
                 <a href="/catalog" class="hover:text-neutral-950 transition">Katalog</a>
                 <a href="/#panduan-grade" class="hover:text-neutral-950 transition">Panduan Grade</a>
                 {% if admin is defined and admin %}
@@ -47,7 +51,7 @@
             <button
                 type="button"
                 onclick="document.getElementById('mobile-menu').classList.toggle('hidden')"
-                aria-label="Menu"
+                aria-label="Buka menu navigasi"
                 class="md:hidden p-1.5 text-neutral-900"
             >
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
@@ -76,7 +80,7 @@
         </div>
     </header>
 
-    <main class="flex-1 max-w-7xl w-full mx-auto px-5 sm:px-8 py-8 sm:py-10">
+    <main id="main-content" class="flex-1 max-w-7xl w-full mx-auto px-5 sm:px-8 py-8 sm:py-10">
         {% block content %}{% endblock %}
     </main>
 
@@ -89,9 +93,126 @@
             <div class="flex flex-wrap gap-6 items-start">
                 <a href="/catalog" class="hover:text-neutral-950">Katalog</a>
                 <a href="/#panduan-grade" class="hover:text-neutral-950">Panduan Grade</a>
+                <button type="button" onclick="a11yTogglePanel()" class="hover:text-neutral-950 underline underline-offset-4">
+                    Menu Aksesibilitas (Alt+A)
+                </button>
                 <a href="/admin" class="hover:text-neutral-950">Admin COE</a>
             </div>
         </div>
     </footer>
+
+    <!-- Floating Accessibility Button (Pojok Kiri Bawah) -->
+    <button
+        type="button"
+        id="a11y-fab"
+        onclick="a11yTogglePanel()"
+        aria-label="Buka Menu Aksesibilitas (Alt+A)"
+        aria-expanded="false"
+        aria-controls="a11y-panel"
+        title="Menu Aksesibilitas (Alt+A)"
+        class="fixed bottom-5 left-5 z-40 w-11 h-11 bg-neutral-950 text-white border border-neutral-700 shadow-lg flex items-center justify-center hover:bg-neutral-800 transition"
+    >
+        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <circle cx="12" cy="5" r="2" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5 9.5h14M12 9.5v5.5m0 0-3 5m3-5 3 5" />
+        </svg>
+    </button>
+
+    <!-- Accessibility Menu Drawer -->
+    <aside
+        id="a11y-panel"
+        role="dialog"
+        aria-label="Menu Aksesibilitas"
+        class="hidden fixed bottom-20 left-5 z-50 w-[320px] sm:w-[350px] max-h-[78vh] overflow-y-auto bg-white border border-neutral-900 shadow-2xl text-neutral-950"
+    >
+        <div class="bg-neutral-950 text-white px-4 py-3 flex items-center justify-between sticky top-0 z-10">
+            <span class="text-xs font-semibold uppercase tracking-widest">Menu Aksesibilitas</span>
+            <div class="flex items-center gap-3">
+                <button type="button" onclick="a11yReset()" class="a11y-ctrl text-[11px] text-neutral-300 hover:text-white underline underline-offset-2" title="Reset semua pengaturan">
+                    Reset
+                </button>
+                <button type="button" onclick="a11yClosePanel()" aria-label="Tutup menu aksesibilitas" class="a11y-ctrl text-neutral-300 hover:text-white text-sm font-bold px-1">
+                    ✕
+                </button>
+            </div>
+        </div>
+
+        <div class="p-4 space-y-5 text-xs">
+            <!-- Ukuran Teks -->
+            <div>
+                <p class="font-mono-num text-[10px] uppercase tracking-wider text-neutral-500 mb-2">Ukuran Teks</p>
+                <div class="flex items-center justify-between border border-neutral-300 p-2">
+                    <button type="button" onclick="a11yAdjustFont(-10)" aria-label="Perkecil teks" class="a11y-ctrl w-8 h-8 border border-neutral-300 hover:border-neutral-950 font-bold text-sm">−</button>
+                    <span id="a11y-font-label" class="font-mono-num font-semibold text-sm">100%</span>
+                    <button type="button" onclick="a11yAdjustFont(10)" aria-label="Perbesar teks" class="a11y-ctrl w-8 h-8 border border-neutral-300 hover:border-neutral-950 font-bold text-sm">+</button>
+                </div>
+            </div>
+
+            <!-- Penyesuaian Konten -->
+            <div>
+                <p class="font-mono-num text-[10px] uppercase tracking-wider text-neutral-500 mb-2">Penyesuaian Konten</p>
+                <div class="grid grid-cols-2 gap-2">
+                    <button type="button" data-a11y-toggle="lineHeight" onclick="a11yToggle('lineHeight')" aria-pressed="false" class="a11y-ctrl a11y-tile border border-neutral-300 p-2.5 text-left hover:border-neutral-950 transition">
+                        <span class="block font-semibold mb-0.5">Jarak Baris</span>
+                        <span class="text-[10px] opacity-75">Baris lebih lega</span>
+                    </button>
+                    <button type="button" data-a11y-toggle="letterSpacing" onclick="a11yToggle('letterSpacing')" aria-pressed="false" class="a11y-ctrl a11y-tile border border-neutral-300 p-2.5 text-left hover:border-neutral-950 transition">
+                        <span class="block font-semibold mb-0.5">Spasi Huruf</span>
+                        <span class="text-[10px] opacity-75">Huruf lebih renggang</span>
+                    </button>
+                    <button type="button" data-a11y-toggle="dyslexia" onclick="a11yToggle('dyslexia')" aria-pressed="false" class="a11y-ctrl a11y-tile border border-neutral-300 p-2.5 text-left hover:border-neutral-950 transition">
+                        <span class="block font-semibold mb-0.5">Font Disleksia</span>
+                        <span class="text-[10px] opacity-75">Mudah dibaca</span>
+                    </button>
+                    <button type="button" data-a11y-toggle="highlightLinks" onclick="a11yToggle('highlightLinks')" aria-pressed="false" class="a11y-ctrl a11y-tile border border-neutral-300 p-2.5 text-left hover:border-neutral-950 transition">
+                        <span class="block font-semibold mb-0.5">Sorot Tautan</span>
+                        <span class="text-[10px] opacity-75">Tandai semua link</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Penyesuaian Warna & Kontras -->
+            <div>
+                <p class="font-mono-num text-[10px] uppercase tracking-wider text-neutral-500 mb-2">Warna &amp; Kontras</p>
+                <div class="grid grid-cols-3 gap-2">
+                    <button type="button" data-a11y-color="high-contrast" onclick="a11ySetColorMode('high-contrast')" aria-pressed="false" class="a11y-ctrl a11y-tile border border-neutral-300 p-2 text-center hover:border-neutral-950 transition font-medium">
+                        Kontras Tinggi
+                    </button>
+                    <button type="button" data-a11y-color="dark-contrast" onclick="a11ySetColorMode('dark-contrast')" aria-pressed="false" class="a11y-ctrl a11y-tile border border-neutral-300 p-2 text-center hover:border-neutral-950 transition font-medium">
+                        Mode Gelap
+                    </button>
+                    <button type="button" data-a11y-color="monochrome" onclick="a11ySetColorMode('monochrome')" aria-pressed="false" class="a11y-ctrl a11y-tile border border-neutral-300 p-2 text-center hover:border-neutral-950 transition font-medium">
+                        Monokrom
+                    </button>
+                </div>
+            </div>
+
+            <!-- Alat Bantu Visual & Navigasi -->
+            <div>
+                <p class="font-mono-num text-[10px] uppercase tracking-wider text-neutral-500 mb-2">Bantuan Visual &amp; Navigasi</p>
+                <div class="grid grid-cols-3 gap-2">
+                    <button type="button" data-a11y-toggle="readingGuide" onclick="a11yToggle('readingGuide')" aria-pressed="false" class="a11y-ctrl a11y-tile border border-neutral-300 p-2 text-center hover:border-neutral-950 transition font-medium">
+                        Garis Baca
+                    </button>
+                    <button type="button" data-a11y-toggle="bigCursor" onclick="a11yToggle('bigCursor')" aria-pressed="false" class="a11y-ctrl a11y-tile border border-neutral-300 p-2 text-center hover:border-neutral-950 transition font-medium">
+                        Kursor Besar
+                    </button>
+                    <button type="button" data-a11y-toggle="stopMotion" onclick="a11yToggle('stopMotion')" aria-pressed="false" class="a11y-ctrl a11y-tile border border-neutral-300 p-2 text-center hover:border-neutral-950 transition font-medium">
+                        Hentikan Animasi
+                    </button>
+                </div>
+            </div>
+
+            <button
+                type="button"
+                onclick="a11yReset()"
+                class="a11y-ctrl w-full bg-neutral-950 text-white text-xs font-medium uppercase tracking-widest py-2.5 hover:bg-neutral-800 transition"
+            >
+                Reset Pengaturan
+            </button>
+        </div>
+    </aside>
+
+    <script src="/static/js/accessibility.js"></script>
 </body>
 </html>

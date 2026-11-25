@@ -1,0 +1,124 @@
+/* Local Thrift — Accessibility Widget & WCAG 2.1 Overrides */
+
+/* Skip to main content */
+.skip-to-content {
+    position: fixed;
+    top: -100px;
+    left: 16px;
+    z-index: 100;
+    background: #111111;
+    color: #ffffff;
+    padding: 10px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: top 0.15s ease;
+}
+.skip-to-content:focus {
+    top: 16px;
+    outline: 3px solid #facc15;
+    outline-offset: 2px;
+}
+
+/* Global crisp focus ring */
+:focus-visible {
+    outline: 2px solid #111111;
+    outline-offset: 2px;
+}
+
+/* 1. Line Height */
+html.a11y-line-height body,
+html.a11y-line-height p,
+html.a11y-line-height li,
+html.a11y-line-height dd,
+html.a11y-line-height dt {
+    line-height: 1.95 !important;
+}
+
+/* 2. Letter Spacing */
+html.a11y-letter-spacing body {
+    letter-spacing: 0.08em !important;
+    word-spacing: 0.14em !important;
+}
+
+/* 3. Dyslexia-friendly reading mode */
+html.a11y-dyslexia body,
+html.a11y-dyslexia h1,
+html.a11y-dyslexia h2,
+html.a11y-dyslexia h3,
+html.a11y-dyslexia p,
+html.a11y-dyslexia a,
+html.a11y-dyslexia button {
+    font-family: Verdana, Arial, Tahoma, sans-serif !important;
+    letter-spacing: 0.04em !important;
+    word-spacing: 0.12em !important;
+}
+
+/* 4. Highlight Links */
+html.a11y-highlight-links a,
+html.a11y-highlight-links button:not(#a11y-fab):not(.a11y-ctrl) {
+    text-decoration: underline !important;
+    text-decoration-thickness: 2px !important;
+    outline: 2px solid #eab308 !important;
+    outline-offset: 2px !important;
+}
+
+/* 5. Color Modes */
+html.a11y-monochrome {
+    filter: grayscale(100%) !important;
+}
+
+html.a11y-high-contrast {
+    filter: contrast(140%) !important;
+}
+
+html.a11y-dark-contrast {
+    filter: invert(1) hue-rotate(180deg) !important;
+    background: #111111 !important;
+}
+html.a11y-dark-contrast img,
+html.a11y-dark-contrast canvas,
+html.a11y-dark-contrast svg.no-invert {
+    filter: invert(1) hue-rotate(180deg) !important;
+}
+
+/* 6. Stop Animations */
+html.a11y-stop-motion *,
+html.a11y-stop-motion *::before,
+html.a11y-stop-motion *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+}
+
+/* 7. Big Cursor */
+html.a11y-big-cursor,
+html.a11y-big-cursor * {
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Cpath d='M4 4 L4 34 L13 25 L20 37 L25 34 L18 22 L30 22 Z' fill='%23111111' stroke='%23ffffff' stroke-width='2.5'/%3E%3C/svg%3E") 4 4, auto !important;
+}
+
+/* 8. Reading Guide bar */
+#a11y-reading-guide {
+    position: fixed;
+    left: 0;
+    right: 0;
+    height: 44px;
+    pointer-events: none;
+    z-index: 90;
+    border-top: 2px solid #111111;
+    border-bottom: 2px solid #111111;
+    background: rgba(250, 204, 21, 0.14);
+    transform: translateY(-50%);
+    display: none;
+}
+html.a11y-reading-guide #a11y-reading-guide {
+    display: block;
+}
+
+/* Active toggle styling inside panel */
+.a11y-tile[aria-pressed="true"] {
+    background-color: #111111 !important;
+    color: #ffffff !important;
+    border-color: #111111 !important;
+}
