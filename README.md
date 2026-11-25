@@ -94,7 +94,7 @@ Baca panduan lengkapnya di [CONTRIBUTING.md](CONTRIBUTING.md).
 
 | Peran | Anggota |
 | :--- | :--- |
-| Backend & API (FastAPI / SQLite) | _(Isi nama & username GitHub)_ |
-| Frontend & UI (Jinja2 / Tailwind CSS) | _(Isi nama & username GitHub)_ |
-| Machine Learning (Python CNN) | _(Isi nama & username GitHub)_ |
-| QA & Dokumentasi | _(Isi nama & username GitHub)_ |
+| Backend & API (FastAPI / SQLite) | _(Hermawan & gdhrmwn)_ |
+| Frontend & UI (Jinja2 / Tailwind CSS) | _(Daud & davidlouis17)_ |
+| Machine Learning (Python CNN) | _(Naya & ⁠Arayacitra)_ |
+| QA & Dokumentasi | _(Ando & Andoamar)_ |
